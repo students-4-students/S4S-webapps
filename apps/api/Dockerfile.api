@@ -1,0 +1,34 @@
+# ── Build stage ──────────────────────────────────────────
+FROM oven/bun:1 AS builder
+
+WORKDIR /app
+
+COPY package.json bun.lockb ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/types/package.json ./packages/types/
+
+RUN bun install --frozen-lockfile
+
+COPY apps/api ./apps/api
+COPY packages/types ./packages/types
+
+WORKDIR /app/apps/api
+
+RUN bunx prisma generate
+RUN bun run build
+
+# ── Runtime stage ─────────────────────────────────────────
+FROM oven/bun:1-slim AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+COPY --from=builder /app/apps/api/dist ./dist
+COPY --from=builder /app/apps/api/package.json ./
+COPY --from=builder /app/apps/api/prisma ./prisma
+COPY --from=builder /app/node_modules ./node_modules
+
+EXPOSE 3001
+
+CMD ["bun", "dist/main.js"]

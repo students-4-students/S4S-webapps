@@ -4,10 +4,112 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  role      Role     @default(PARTICIPANT)
+  sectionId String?
+  section   Section? @relation(fields: [sectionId], references: [id])
+  createdAt DateTime @default(now())
+
+  pollResponses PollResponse[]
+  incidents     Incident[]
+}
+
+enum Role {
+  PARTICIPANT
+  STAFF
+  ADMIN
+}
+
+model Section {
+  id            String         @id @default(uuid())
+  name          String
+  users         User[]
+  scheduleSlots ScheduleSlot[]
+}
+
+model ScheduleSlot {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  startTime   DateTime
+  endTime     DateTime
+  location    String?
+  sectionId   String?
+  section     Section? @relation(fields: [sectionId], references: [id])
+}
+
+model Poll {
+  id         String         @id @default(uuid())
+  question   String
+  targetRole Role
+  active     Boolean        @default(true)
+  createdAt  DateTime       @default(now())
+  options    PollOption[]
+  responses  PollResponse[]
+}
+
+model PollOption {
+  id        String         @id @default(uuid())
+  label     String
+  pollId    String
+  poll      Poll           @relation(fields: [pollId], references: [id])
+  responses PollResponse[]
+}
+
+model PollResponse {
+  id       String     @id @default(uuid())
+  userId   String
+  pollId   String
+  optionId String
+  user     User       @relation(fields: [userId], references: [id])
+  poll     Poll       @relation(fields: [pollId], references: [id])
+  option   PollOption @relation(fields: [optionId], references: [id])
+
+  @@unique([userId, pollId])
+}
+
+model Incident {
+  id           String         @id @default(uuid())
+  title        String
+  description  String
+  severity     Severity       @default(LOW)
+  status       IncidentStatus @default(OPEN)
+  reportedById String
+  reportedBy   User           @relation(fields: [reportedById], references: [id])
+  createdAt    DateTime       @default(now())
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum IncidentStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+model File {
+  id         String   @id @default(uuid())
+  name       String
+  mimeType   String
+  size       Int
+  bucket     String
+  key        String
+  uploadedAt DateTime @default(now())
 }
