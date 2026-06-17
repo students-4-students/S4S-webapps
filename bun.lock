@@ -4,6 +4,11 @@
   "workspaces": {
     "": {
       "name": "s4s",
+      "dependencies": {
+        "@tanstack/react-query": "^5.101.0",
+        "@trpc/client": "^11.17.0",
+        "@trpc/react-query": "^11.17.0",
+      },
     },
     "apps/api": {
       "name": "@s4s/api",
@@ -61,12 +66,13 @@
       "version": "0.0.0",
       "dependencies": {
         "@s4s/types": "workspace:*",
-        "@tanstack/react-query": "^5.45.0",
-        "@trpc/client": "^11.0.0",
-        "@trpc/react-query": "^11.0.0",
+        "@tanstack/react-query": "^5.101.0",
+        "@trpc/client": "^11.17.0",
+        "@trpc/react-query": "^11.17.0",
         "react": "^19.2.6",
         "react-dom": "^19.2.6",
         "zod": "^3.23.8",
+        "zustand": "^5.0.14",
       },
       "devDependencies": {
         "@eslint/js": "^10.0.1",
@@ -88,14 +94,15 @@
       "version": "0.0.0",
       "dependencies": {
         "@s4s/types": "workspace:*",
-        "@tanstack/react-query": "^5.45.0",
-        "@trpc/client": "^11.0.0",
-        "@trpc/react-query": "^11.0.0",
+        "@tanstack/react-query": "^5.101.0",
+        "@trpc/client": "^11.17.0",
+        "@trpc/react-query": "^11.17.0",
         "maplibre-gl": "^4.3.2",
         "react": "^19.2.6",
         "react-dom": "^19.2.6",
         "socket.io-client": "^4.7.5",
         "zod": "^3.23.8",
+        "zustand": "^5.0.14",
       },
       "devDependencies": {
         "@eslint/js": "^10.0.1",
@@ -1777,6 +1784,8 @@
     "zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
 
     "zod-validation-error": ["zod-validation-error@4.0.2", "", { "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" } }, "sha512-Q6/nZLe6jxuU80qb/4uJ4t5v2VEZ44lzQjPDhYJNztRQ4wyWc6VF3D3Kb/fAuPetZQnhS3hnajCf9CsWesghLQ=="],
+
+    "zustand": ["zustand@5.0.14", "", { "peerDependencies": { "@types/react": ">=18.0.0", "immer": ">=9.0.6", "react": ">=18.0.0", "use-sync-external-store": ">=1.2.0" }, "optionalPeers": ["@types/react", "immer", "react", "use-sync-external-store"] }, "sha512-/8tAspM5LMPr28b3fwLYrtdj77ECpfZviaP75CMTnwO8ISyaE4GDIG/9rDDYq/cH9D2Xw2A2RXglLInmVBQB/g=="],
 
     "@angular-devkit/core/ajv": ["ajv@8.18.0", "", { "dependencies": { "fast-deep-equal": "^3.1.3", "fast-uri": "^3.0.1", "json-schema-traverse": "^1.0.0", "require-from-string": "^2.0.2" } }, "sha512-PlXPeEWMXMZ7sPYOHqmDyCJzcfNrUr3fGNKtezX14ykXOEIvyK81d+qydx89KY5O71FKMPaQ2vBfBFI5NHR63A=="],
 
