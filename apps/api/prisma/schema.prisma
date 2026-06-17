@@ -1,8 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["driverAdapters"]
@@ -12,25 +10,81 @@ datasource db {
   provider = "postgresql"
 }
 
+// ─── ENUMS ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  PARTICIPANT
+  STAFF
+  ADMIN
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum IncidentStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum ScheduleType {
+  LECTURE
+  EXERCISE
+  WORKSHOP
+  ACTIVITY
+  FREE
+}
+
+enum TaskCategory {
+  LOGISTIQUE
+  MATERIEL
+  ANIMATION
+  PEDAGOGIE
+  COMMUNICATION
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum StaffStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+}
+
+// ─── CORE MODELS ──────────────────────────────────────────────────────────────
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
   password  String
   firstName String
   lastName  String
-  role      Role     @default(PARTICIPANT)
-  sectionId String?
-  section   Section? @relation(fields: [sectionId], references: [id])
-  createdAt DateTime @default(now())
+  role             Role     @default(PARTICIPANT)
+  sectionId        String?
+  section          Section? @relation(fields: [sectionId], references: [id])
+  telegramUsername String?  @unique // e.g. "@johndoe" — validated at API layer
+  telegramChatId   String?  @unique // set by the bot on first /start
+  createdAt        DateTime @default(now())
 
-  pollResponses PollResponse[]
-  incidents     Incident[]
-}
-
-enum Role {
-  PARTICIPANT
-  STAFF
-  ADMIN
+  pollResponses     PollResponse[]
+  reportedIncidents Incident[]     @relation("ReportedIncidents")
+  assignedIncidents Incident[]     @relation("AssignedIncidents")
+  staffProfile      StaffMember?
 }
 
 model Section {
@@ -40,16 +94,99 @@ model Section {
   scheduleSlots ScheduleSlot[]
 }
 
+// ─── SCHEDULE ─────────────────────────────────────────────────────────────────
+
 model ScheduleSlot {
-  id          String   @id @default(uuid())
+  id          String       @id @default(uuid())
   title       String
   description String?
+  type        ScheduleType
   startTime   DateTime
   endTime     DateTime
   location    String?
   sectionId   String?
-  section     Section? @relation(fields: [sectionId], references: [id])
+  section     Section?     @relation(fields: [sectionId], references: [id])
 }
+
+// ─── STAFF ────────────────────────────────────────────────────────────────────
+
+// Represents a physical staff member, optionally linked to a User account
+model StaffMember {
+  id        String      @id @default(uuid())
+  userId    String?     @unique
+  user      User?       @relation(fields: [userId], references: [id])
+  firstName String
+  lastName  String
+  role      String
+  status    StaffStatus @default(ACTIVE)
+  isPresent        Boolean @default(false)
+  telegramUsername String?
+  telegramChatId   String?
+  phone            String?
+  email     String?
+  createdAt DateTime    @default(now())
+
+  shifts          Shift[]
+  taskAssignments TaskAssignment[]
+}
+
+// A shift is a scheduled time block for a staff member
+model Shift {
+  id            String      @id @default(uuid())
+  staffMemberId String
+  staffMember   StaffMember @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+  startTime     DateTime
+  endTime       DateTime
+  location      String?
+  notes         String?
+}
+
+// ─── TASKS ────────────────────────────────────────────────────────────────────
+
+model Task {
+  id          String       @id @default(uuid())
+  name        String
+  description String?
+  category    TaskCategory
+  startTime   DateTime
+  endTime     DateTime
+  location    String?
+  status      TaskStatus   @default(PENDING)
+  priority    Priority     @default(MEDIUM)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  assignments TaskAssignment[]
+}
+
+model TaskAssignment {
+  id            String      @id @default(uuid())
+  taskId        String
+  task          Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  staffMemberId String
+  staffMember   StaffMember @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, staffMemberId])
+}
+
+// ─── INCIDENTS ────────────────────────────────────────────────────────────────
+
+model Incident {
+  id           String         @id @default(uuid())
+  title        String
+  description  String
+  location     String?
+  category     String?
+  severity     Severity       @default(LOW)
+  status       IncidentStatus @default(OPEN)
+  reportedById String
+  reportedBy   User           @relation("ReportedIncidents", fields: [reportedById], references: [id])
+  assignedTo   User[]         @relation("AssignedIncidents")
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+// ─── POLLS ────────────────────────────────────────────────────────────────────
 
 model Poll {
   id         String         @id @default(uuid())
@@ -81,28 +218,7 @@ model PollResponse {
   @@unique([userId, pollId])
 }
 
-model Incident {
-  id           String         @id @default(uuid())
-  title        String
-  description  String
-  severity     Severity       @default(LOW)
-  status       IncidentStatus @default(OPEN)
-  reportedById String
-  reportedBy   User           @relation(fields: [reportedById], references: [id])
-  createdAt    DateTime       @default(now())
-}
-
-enum Severity {
-  LOW
-  MEDIUM
-  HIGH
-}
-
-enum IncidentStatus {
-  OPEN
-  IN_PROGRESS
-  RESOLVED
-}
+// ─── FILES ────────────────────────────────────────────────────────────────────
 
 model File {
   id         String   @id @default(uuid())
