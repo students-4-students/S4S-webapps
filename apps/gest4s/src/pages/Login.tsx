@@ -18,12 +18,12 @@ export function Login() {
   })
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+    <div className='container'>
       <div style={{ width: 320, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 500, marginBottom: 8 }}>Gest4S</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 500, padding:0, margin:0}}>Gest4S</h1>
 
         {error && (
-          <p style={{ color: 'var(--color-text-danger)', fontSize: 14 }}>{error}</p>
+          <p style={{ color: 'red', fontSize: 14 }}>{error}</p>
         )}
 
         <input
