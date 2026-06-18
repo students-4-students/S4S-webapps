@@ -1,23 +1,15 @@
 import { AuthGuard } from './components/AuthGuard'
-import { useAuthStore } from './store/auth'
+import Dashboard from './pages/Dashboard'
 
-function Dashboard() {
-  const user = useAuthStore((s) => s.user)
-  const logout = useAuthStore((s) => s.logout)
-
-  return (
-    <div style={{ padding: 32 }}>
-      <p>Welcome, {user?.firstName} {user?.lastName}</p>
-      <p style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{user?.role}</p>
-      <button onClick={logout} style={{ marginTop: 16 }}>Log out</button>
-    </div>
-  )
-}
 
 export default function App() {
   return (
-    <AuthGuard>
-      <Dashboard />
-    </AuthGuard>
+    <div style={{width:"100%", height:"100%"}}>
+      <AuthGuard>
+        <Dashboard />
+      </AuthGuard>
+      <img src='agep.svg'  style={{width:"10vw", position:"absolute", top:10, left:10}}/>
+      <img src='s4s-logo.svg'  style={{width:"5vw", position:"absolute", top:0, right:10}}/>
+    </div>
   )
 }
