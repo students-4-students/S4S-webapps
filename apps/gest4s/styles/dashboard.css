@@ -14,7 +14,7 @@
 }
 
 .btn-primary {
-    background: var(--primary-pink, #e75480);
+    background: var(--secondary-pink);
     color: white;
     border: none;
     border-radius: 0.5rem;
