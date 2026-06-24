@@ -60,10 +60,19 @@ function CreateIncidentModal({ onClose }: Props) {
           </label>
           <label>
             Catégorie
-            <input
+            <select
               value={form.category}
               onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-            />
+            >
+              <option value=''>—</option>
+              <option value='Matériel'>Matériel</option>
+              <option value='Problèmes techniques'>Problèmes techniques</option>
+              <option value='Logistique'>Logistique</option>
+              <option value='Catering'>Catering</option>
+              <option value='RH'>RH</option>
+              <option value='Exercices'>Exercices</option>
+              <option value='Cours'>Cours</option>
+            </select>
           </label>
           <label>
             Sévérité

@@ -32,6 +32,40 @@ export const incidentsRouter = router({
       return incident
     }),
 
+  getById: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input, ctx }) => {
+      return ctx.db.incident.findUniqueOrThrow({
+        where: { id: input.id },
+        include: {
+          reportedBy: { select: { firstName: true, lastName: true, telegramUsername: true } },
+          assignedTo: { select: { id: true, firstName: true, lastName: true } },
+        },
+      })
+    }),
+
+  update: protectedProcedure
+    .input(z.object({
+      id: z.string(),
+      title: z.string().min(1).optional(),
+      description: z.string().min(1).optional(),
+      location: z.string().optional(),
+      category: z.string().optional(),
+      severity: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
+      status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED']).optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const { id, ...data } = input
+      return ctx.db.incident.update({
+        where: { id },
+        data,
+        include: {
+          reportedBy: { select: { firstName: true, lastName: true, telegramUsername: true } },
+          assignedTo: { select: { id: true, firstName: true, lastName: true } },
+        },
+      })
+    }),
+
   onCreated: protectedProcedure.subscription(async function* ({ signal }) {
     for await (const [incident] of on(incidentEmitter, 'created', { signal })) {
       yield incident as { id: string }

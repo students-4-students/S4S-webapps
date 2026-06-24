@@ -1,15 +1,14 @@
-import { AuthGuard } from './components/AuthGuard'
-import Dashboard from './pages/Dashboard'
+import { createRouter, RouterProvider } from '@tanstack/react-router'
+import { routeTree } from './routeTree.gen'
 
+const router = createRouter({ routeTree })
+
+declare module '@tanstack/react-router' {
+  interface Register {
+    router: typeof router
+  }
+}
 
 export default function App() {
-  return (
-    <div style={{width:"100%", height:"100%"}}>
-      <AuthGuard>
-        <Dashboard />
-      </AuthGuard>
-      <img src='agep.svg'  style={{width:"10vw", position:"absolute", top:10, left:10}}/>
-      <img src='s4s-logo.svg'  style={{width:"5vw", position:"absolute", top:0, right:10}}/>
-    </div>
-  )
+  return <RouterProvider router={router} />
 }
