@@ -1,98 +1,59 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Backend API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+## 🛠️ How to Add New tRPC Routers and Routes
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+To add new API routes to the backend, follow these steps:
 
-## Description
+### Step 1: Ensure DB Model Exists
+Verify that your database model is defined in the Prisma schema:
+* Open [schema.prisma](./prisma/schema.prisma) and define/modify your model if needed.
+* Run Prisma migrations if schema changes were made.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+### Step 2: Create a New Router File
+Create a new file in `apps/api/src/routers/`. For example, `schedules.ts`:
+```typescript
+import { z } from 'zod'
+import { router, protectedProcedure, publicProcedure } from '../trpc/trpc'
 
-## Project setup
-
-```bash
-$ npm install
+export const schedulesRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.db.scheduleSlot.findMany()
+  }),
+  create: protectedProcedure
+    .input(z.object({
+      title: z.string(),
+      type: z.enum(['LECTURE', 'EXERCISE', 'WORKSHOP', 'ACTIVITY', 'FREE']),
+      startTime: z.coerce.date(),
+      endTime: z.coerce.date(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      return ctx.db.scheduleSlot.create({ data: input })
+    }),
+})
 ```
 
-## Compile and run the project
+### Step 3: Register Your Router
+Register your new router in [index.ts](./src/routers/index.ts):
+```typescript
+import { schedulesRouter } from './schedules'
 
-```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+export const appRouter = router({
+  auth: authRouter,
+  incidents: incidentsRouter,
+  staffs: staffsRouter,
+  schedules: schedulesRouter, // <-- Add here
+})
 ```
 
-## Run tests
+### Step 4: Use in Frontend
+Use the automatically typed client in `apps/gest4s` (or `apps/s4s-connect`):
+```typescript
+import { trpc } from '../trpc'
 
-```bash
-# unit tests
-$ npm run test
+// Querying data:
+const { data, isLoading } = trpc.schedules.list.useQuery()
 
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+// Mutating data:
+const createMutation = trpc.schedules.create.useMutation()
+createMutation.mutate({ title: 'New Class', ... })
 ```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).

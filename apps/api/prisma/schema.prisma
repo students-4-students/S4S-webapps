@@ -106,6 +106,12 @@ model ScheduleSlot {
   location    String?
   sectionId   String?
   section     Section?     @relation(fields: [sectionId], references: [id])
+  speakerId   String?
+  speaker     StaffMember? @relation("SpeakerSlots", fields: [speakerId], references: [id])
+  assistantId String?
+  assistant   StaffMember? @relation("AssistantSlots", fields: [assistantId], references: [id])
+  rcId        String?
+  rc          StaffMember? @relation("RcSlots", fields: [rcId], references: [id])
 }
 
 // ─── STAFF ────────────────────────────────────────────────────────────────────
@@ -124,10 +130,14 @@ model StaffMember {
   telegramChatId   String?
   phone            String?
   email     String?
+  score     Int         @default(0)
   createdAt DateTime    @default(now())
 
   shifts          Shift[]
   taskAssignments TaskAssignment[]
+  speakerSlots    ScheduleSlot[] @relation("SpeakerSlots")
+  assistantSlots  ScheduleSlot[] @relation("AssistantSlots")
+  rcSlots         ScheduleSlot[] @relation("RcSlots")
 }
 
 // A shift is a scheduled time block for a staff member
