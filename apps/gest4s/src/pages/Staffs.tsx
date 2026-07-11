@@ -54,6 +54,16 @@ function Staffs() {
   const { data: staffs = [], isLoading } = trpc.staffs.list.useQuery()
   const { data: courses = [] } = trpc.schedules.list.useQuery()
 
+  trpc.staffs.onUpdated.useSubscription(undefined, {
+    onData: () => {
+      console.log('[DEBUG] Staffs page subscription event received! Invalidating staffs list.')
+      utils.staffs.list.invalidate()
+    },
+    onError: (err) => {
+      console.error('[DEBUG] Staffs page subscription error:', err)
+    }
+  })
+
   const createMutation = trpc.staffs.create.useMutation()
   const importMutation = trpc.staffs.importStaffs.useMutation()
   const updateMutation = trpc.staffs.update.useMutation()

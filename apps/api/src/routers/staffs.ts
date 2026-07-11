@@ -1,5 +1,9 @@
 import { z } from 'zod'
-import { router, protectedProcedure } from '../trpc/trpc'
+import { router, protectedProcedure, publicProcedure } from '../trpc/trpc'
+import { EventEmitter, on } from 'events'
+
+export const staffsEmitter = new EventEmitter()
+staffsEmitter.setMaxListeners(100)
 
 export const staffsRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
@@ -41,6 +45,7 @@ export const staffsRouter = router({
         },
       });
 
+      staffsEmitter.emit('updated')
       return newStaff;
     }),
 
@@ -82,6 +87,7 @@ export const staffsRouter = router({
       }
       
       console.log(`[DEBUG] [StaffsRouter] Bulk import complete. Created ${createdStaffs.length} staffs`);
+      staffsEmitter.emit('updated')
       return createdStaffs;
     }),
 
@@ -110,6 +116,7 @@ export const staffsRouter = router({
           email: data.email === '' ? null : data.email,
         },
       });
+      staffsEmitter.emit('updated')
       return updated;
     }),
 
@@ -160,6 +167,7 @@ export const staffsRouter = router({
       }
 
       console.log(`[DEBUG] [StaffsRouter] Re-assigned slots successfully`);
+      staffsEmitter.emit('updated')
       return { success: true };
     }),
 
@@ -170,6 +178,18 @@ export const staffsRouter = router({
       await ctx.db.staffMember.delete({
         where: { id: input.id },
       });
+      staffsEmitter.emit('updated')
       return { success: true };
     }),
+
+  trigger: publicProcedure.mutation(async () => {
+    staffsEmitter.emit('updated')
+    return { success: true }
+  }),
+
+  onUpdated: publicProcedure.subscription(async function* ({ signal }) {
+    for await (const _ of on(staffsEmitter, 'updated', { signal })) {
+      yield { updated: true }
+    }
+  }),
 });
