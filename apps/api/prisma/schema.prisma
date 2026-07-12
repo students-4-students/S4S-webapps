@@ -43,6 +43,8 @@ enum ScheduleType {
   WORKSHOP
   ACTIVITY
   FREE
+  SPECIAL
+  MEAL
 }
 
 enum TaskCategory {

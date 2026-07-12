@@ -1,6 +1,25 @@
 import { z } from 'zod'
 import { router, protectedProcedure } from '../trpc/trpc'
 
+async function resolveSectionId(sectionNameOrId: string | null | undefined, db: any): Promise<string | null> {
+  if (!sectionNameOrId) return null
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (uuidRegex.test(sectionNameOrId)) {
+    const existing = await db.section.findUnique({ where: { id: sectionNameOrId } })
+    if (existing) return existing.id
+  }
+  const section = await db.section.findFirst({
+    where: { name: { equals: sectionNameOrId, mode: 'insensitive' } }
+  })
+  if (section) {
+    return section.id
+  }
+  const newSection = await db.section.create({
+    data: { name: sectionNameOrId }
+  })
+  return newSection.id
+}
+
 export const schedulesRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     return ctx.db.scheduleSlot.findMany({
@@ -17,8 +36,9 @@ export const schedulesRouter = router({
   listBySection: protectedProcedure
     .input(z.object({ sectionId: z.string() }))
     .query(async ({ input, ctx }) => {
+      const resolvedId = await resolveSectionId(input.sectionId, ctx.db)
       return ctx.db.scheduleSlot.findMany({
-        where: { sectionId: input.sectionId },
+        where: { sectionId: resolvedId || input.sectionId },
         orderBy: { startTime: 'asc' },
         include: {
           section: true,
@@ -48,7 +68,7 @@ export const schedulesRouter = router({
     .input(z.object({
       title: z.string().min(1),
       description: z.string().optional().nullable(),
-      type: z.enum(['LECTURE', 'EXERCISE', 'WORKSHOP', 'ACTIVITY', 'FREE']),
+      type: z.enum(['LECTURE', 'EXERCISE', 'WORKSHOP', 'ACTIVITY', 'FREE', 'SPECIAL', 'MEAL']),
       startTime: z.coerce.date(),
       endTime: z.coerce.date(),
       location: z.string().optional().nullable(),
@@ -58,8 +78,12 @@ export const schedulesRouter = router({
       rcId: z.string().optional().nullable(),
     }))
     .mutation(async ({ input, ctx }) => {
+      const resolvedSectionId = await resolveSectionId(input.sectionId, ctx.db)
       return ctx.db.scheduleSlot.create({
-        data: input,
+        data: {
+          ...input,
+          sectionId: resolvedSectionId,
+        },
         include: {
           section: true,
           speaker: { select: { id: true, firstName: true, lastName: true } },
@@ -74,7 +98,7 @@ export const schedulesRouter = router({
       id: z.string(),
       title: z.string().min(1).optional(),
       description: z.string().optional().nullable(),
-      type: z.enum(['LECTURE', 'EXERCISE', 'WORKSHOP', 'ACTIVITY', 'FREE']).optional(),
+      type: z.enum(['LECTURE', 'EXERCISE', 'WORKSHOP', 'ACTIVITY', 'FREE', 'SPECIAL', 'MEAL']).optional(),
       startTime: z.coerce.date().optional(),
       endTime: z.coerce.date().optional(),
       location: z.string().optional().nullable(),
@@ -85,6 +109,9 @@ export const schedulesRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const { id, ...data } = input
+      if ('sectionId' in data) {
+        data.sectionId = await resolveSectionId(data.sectionId, ctx.db)
+      }
       return ctx.db.scheduleSlot.update({
         where: { id },
         data,
@@ -119,37 +146,47 @@ export const schedulesRouter = router({
 
       // Check Location Overlaps
       if (input.location) {
-        const locationConflicts = await ctx.db.scheduleSlot.findMany({
-          where: {
-            id: input.id ? { not: input.id } : undefined,
-            location: input.location,
-            startTime: { lt: input.endTime },
-            endTime: { gt: input.startTime },
-          },
-        })
-        for (const slot of locationConflicts) {
-          conflicts.push({
-            type: 'LOCATION',
-            message: `La salle '${input.location}' est déjà occupée par le cours '${slot.title}' sur ce créneau.`,
+        const inputRooms = input.location.split(/[,;/]+/).map((r) => r.trim().toUpperCase()).filter((r) => r.length > 0)
+        if (inputRooms.length > 0) {
+          const potentialConflicts = await ctx.db.scheduleSlot.findMany({
+            where: {
+              id: input.id ? { not: input.id } : undefined,
+              startTime: { lt: input.endTime },
+              endTime: { gt: input.startTime },
+              location: { not: null },
+            },
           })
+          for (const slot of potentialConflicts) {
+            const slotRooms = slot.location!.split(/[,;/]+/).map((r) => r.trim().toUpperCase()).filter((r) => r.length > 0)
+            const overlap = inputRooms.some(r => slotRooms.includes(r))
+            if (overlap) {
+              conflicts.push({
+                type: 'LOCATION',
+                message: `La salle '${slot.location}' est déjà occupée par le cours '${slot.title}' sur ce créneau.`,
+              })
+            }
+          }
         }
       }
 
       // Check Section Overlaps
       if (input.sectionId) {
-        const sectionConflicts = await ctx.db.scheduleSlot.findMany({
-          where: {
-            id: input.id ? { not: input.id } : undefined,
-            sectionId: input.sectionId,
-            startTime: { lt: input.endTime },
-            endTime: { gt: input.startTime },
-          },
-        })
-        for (const slot of sectionConflicts) {
-          conflicts.push({
-            type: 'SECTION',
-            message: `La section est déjà occupée par le cours '${slot.title}' sur ce créneau.`,
+        const resolvedSectionId = await resolveSectionId(input.sectionId, ctx.db)
+        if (resolvedSectionId) {
+          const sectionConflicts = await ctx.db.scheduleSlot.findMany({
+            where: {
+              id: input.id ? { not: input.id } : undefined,
+              sectionId: resolvedSectionId,
+              startTime: { lt: input.endTime },
+              endTime: { gt: input.startTime },
+            },
           })
+          for (const slot of sectionConflicts) {
+            conflicts.push({
+              type: 'SECTION',
+              message: `La section est déjà occupée par le cours '${slot.title}' sur ce créneau.`,
+            })
+          }
         }
       }
 
