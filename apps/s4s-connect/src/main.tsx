@@ -5,6 +5,7 @@ import { TRPCClientError } from '@trpc/client'
 import { useAuthStore } from './store/auth'
 import { trpc, makeTrpcClient } from './trpc'
 import App from './App'
+import './styles/connect.css'
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({

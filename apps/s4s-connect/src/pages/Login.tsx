@@ -13,17 +13,20 @@ export function Login() {
       setAuth(data.token, data.user)
     },
     onError(e) {
-      setError(e.message)
+      setError("L'email ou le mot de passe est incorrect.")
     },
   })
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+    <div className='container'>
       <div style={{ width: 320, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 500, marginBottom: 8 }}>Gest4S</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 700, padding: 0, margin: '0 0 10px', color: 'var(--primary-purple-dark)', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <img src="/s4s-logo.svg" style={{ width: 40, height: 40, marginRight: 10 }} />
+          S4S Connect 
+        </h1>
 
         {error && (
-          <p style={{ color: 'var(--color-text-danger)', fontSize: 14 }}>{error}</p>
+          <p style={{ color: 'var(--error)', fontSize: 14, textAlign: 'center', fontWeight: 600 }}>{error}</p>
         )}
 
         <input
@@ -34,7 +37,7 @@ export function Login() {
         />
         <input
           type="password"
-          placeholder="Password"
+          placeholder="Mot de passe"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && login.mutate({ email, password })}
@@ -42,10 +45,13 @@ export function Login() {
         <button
           onClick={() => login.mutate({ email, password })}
           disabled={login.isPending}
+          className="btn-primary"
+          style={{ width: '100%', marginTop: '0.5rem' }}
         >
-          {login.isPending ? 'Signing in...' : 'Sign in'}
+          {login.isPending ? 'Connexion en cours...' : 'Se connecter'}
         </button>
       </div>
+      <img src="/agep.svg" style={{ width: 200, height: 200, position: 'absolute', bottom: 0, right: 30}} />
     </div>
   )
 }
