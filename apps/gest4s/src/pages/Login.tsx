@@ -10,6 +10,10 @@ export function Login() {
 
   const login = trpc.auth.login.useMutation({
     onSuccess(data) {
+      if (data.user.role === 'PARTICIPANT') {
+        setError("Accès refusé. Les étudiants ne sont pas autorisés à accéder à Gest4S.")
+        return
+      }
       setAuth(data.token, data.user)
     },
     onError(e) {
