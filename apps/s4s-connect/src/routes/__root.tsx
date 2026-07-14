@@ -1,4 +1,4 @@
-import { createRootRoute, Link, Outlet } from '@tanstack/react-router'
+import { createRootRoute, Link, Outlet, useLocation } from '@tanstack/react-router'
 import { AuthGuard } from '../components/AuthGuard'
 import { useAuthStore } from '../store/auth'
 import { useState } from 'react'
@@ -11,6 +11,17 @@ function RootLayout() {
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
   const [menuOpen, setMenuOpen] = useState(false)
+  const location = useLocation()
+
+  const isSetupPassword = location.pathname === '/setup-password'
+
+  if (isSetupPassword) {
+    return (
+      <div className="app-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Outlet />
+      </div>
+    )
+  }
 
   return (
     <AuthGuard>
@@ -18,7 +29,7 @@ function RootLayout() {
         {/* Header */}
         <header className="app-header">
           <div className="header-brand">
-            <img src="/s4s-logo.svg" alt="S4S Logo" className="brand-logo" />
+            <span className="brand-logo">⚡</span>
             <span className="brand-name">S4S Connect</span>
           </div>
           
@@ -29,6 +40,7 @@ function RootLayout() {
               </div>
               <div className="user-details">
                 <span className="user-name">{user?.firstName} {user?.lastName}</span>
+                <span className="user-section">{user?.role} · {user?.sectionId ? 'CMS' : 'Général'}</span>
               </div>
             </div>
 
@@ -94,7 +106,7 @@ function RootLayout() {
             <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
             </svg>
-            <span className="nav-label">Workshops</span>
+            <span className="nav-label">Ateliers</span>
           </Link>
 
           <Link to="/feedback" className="nav-item" activeProps={{ className: 'active' }}>
