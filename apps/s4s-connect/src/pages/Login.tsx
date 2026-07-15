@@ -12,7 +12,7 @@ export function Login() {
     onSuccess(data) {
       setAuth(data.token, data.user)
     },
-    onError(e) {
+    onError(_e) {
       setError("L'email ou le mot de passe est incorrect.")
     },
   })

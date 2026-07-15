@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { router, protectedProcedure, publicProcedure, staffProcedure } from '../trpc/trpc'
+import { router, publicProcedure, staffProcedure } from '../trpc/trpc'
 import { EventEmitter, on } from 'events'
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'

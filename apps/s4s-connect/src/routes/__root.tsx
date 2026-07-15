@@ -29,7 +29,7 @@ function RootLayout() {
         {/* Header */}
         <header className="app-header">
           <div className="header-brand">
-            <span className="brand-logo">⚡</span>
+            <img className="brand-logo" src="/s4s-logo.svg" alt="S4S Connect Logo" />
             <span className="brand-name">S4S Connect</span>
           </div>
           
@@ -40,7 +40,6 @@ function RootLayout() {
               </div>
               <div className="user-details">
                 <span className="user-name">{user?.firstName} {user?.lastName}</span>
-                <span className="user-section">{user?.role} · {user?.sectionId ? 'CMS' : 'Général'}</span>
               </div>
             </div>
 
@@ -86,7 +85,7 @@ function RootLayout() {
             <span className="nav-label">Horaire</span>
           </Link>
 
-          <Link to="/map" className="nav-item" activeProps={{ className: 'active' }}>
+          <Link to={"/map" as any} className="nav-item" activeProps={{ className: 'active' }}>
             <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21" />
               <line x1="9" y1="3" x2="9" y2="18" />
@@ -95,21 +94,21 @@ function RootLayout() {
             <span className="nav-label">Plan</span>
           </Link>
 
-          <Link to="/drive" className="nav-item" activeProps={{ className: 'active' }}>
+          <Link to={"/drive" as any} className="nav-item" activeProps={{ className: 'active' }}>
             <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
             </svg>
             <span className="nav-label">Drive</span>
           </Link>
 
-          <Link to="/workshops" className="nav-item" activeProps={{ className: 'active' }}>
+          <Link to={"/workshops" as any} className="nav-item" activeProps={{ className: 'active' }}>
             <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
             </svg>
             <span className="nav-label">Ateliers</span>
           </Link>
 
-          <Link to="/feedback" className="nav-item" activeProps={{ className: 'active' }}>
+          <Link to={"/feedback" as any} className="nav-item" activeProps={{ className: 'active' }}>
             <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
