@@ -580,7 +580,7 @@ body:has(.schedule-container) .app-main {
 }
 
 /* Adjust layout on desktop vs mobile for schedule container */
-@media (min-width: 1024px) {
+@media (min-width: 1025px) {
   body:has(.schedule-container) .app-main {
     max-width: 1400px;
     padding-bottom: 90px; /* Keep enough bottom spacing to clear center nav bar */
@@ -633,4 +633,392 @@ body:has(.schedule-container) .app-main {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* ========================================== */
+/* Map Page Styles                            */
+/* ========================================== */
+
+.map-page-container {
+  display: flex;
+  width: 100%;
+  height: calc(100vh - 128px); /* 100vh minus header (60px) and bottom-nav (68px) */
+  position: relative;
+  overflow: hidden;
+  background-color: var(--bg-app);
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.map-sidebar {
+  width: 280px;
+  background-color: rgba(26, 17, 43, 0.95);
+  backdrop-filter: blur(10px);
+  border-right: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  z-index: 10;
+  transition: all var(--transition-normal);
+}
+
+.map-search-box {
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  position: relative;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.map-search-box input {
+  width: 100%;
+  background-color: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: white;
+  border-radius: var(--radius-lg);
+  padding: 0.6rem 2.2rem 0.6rem 2.2rem;
+  font-size: 0.85rem;
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.map-search-box input:focus {
+  border-color: var(--secondary-pink);
+  background-color: rgba(255,255,255,0.12);
+}
+
+.map-search-box .search-icon {
+  position: absolute;
+  left: 1.6rem;
+  width: 16px;
+  height: 16px;
+  color: rgba(255,255,255,0.5);
+  pointer-events: none;
+}
+
+.map-search-box .clear-search-btn {
+  position: absolute;
+  right: 1.6rem;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.5);
+  font-size: 1.25rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.active-map-filter-alert {
+  background-color: rgba(255, 102, 179, 0.15);
+  border-bottom: 1px solid rgba(255, 102, 179, 0.25);
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: white;
+}
+
+.active-map-filter-alert button {
+  background: var(--secondary-pink);
+  border: none;
+  color: white;
+  border-radius: 4px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.places-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem;
+  gap: 0.5rem;
+}
+
+.places-list::-webkit-scrollbar {
+  width: 5px;
+}
+.places-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.places-list::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 9999px;
+}
+
+.place-list-item {
+  padding: 0.85rem;
+  border-radius: var(--radius-lg);
+  background-color: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.05);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+}
+
+.place-list-item:hover {
+  background-color: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.1);
+}
+
+.place-list-item.selected {
+  background-color: rgba(255, 102, 179, 0.1) !important;
+  border-color: var(--secondary-pink) !important;
+}
+
+.place-list-item.url-highlighted {
+  border-left: 3px solid var(--secondary-pink);
+}
+
+.place-item-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.place-item-code {
+  background-color: var(--primary-purple);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+}
+
+.place-item-name {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: white;
+}
+
+
+
+.place-item-rooms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.room-pill {
+  font-size: 0.65rem;
+  background-color: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--primary-pink);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+}
+
+.no-places-found {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.map-viewport-wrapper {
+  flex: 1;
+  height: 100%;
+  position: relative;
+}
+
+.map-viewport-div {
+  width: 100%;
+  height: 100%;
+}
+
+.maplibregl-popup-content {
+  background-color: var(--primary-purple-dark) !important;
+  color: white !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: var(--radius-lg) !important;
+  padding: 0.85rem !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.maplibregl-popup-anchor-top .maplibregl-popup-tip {
+  border-bottom-color: var(--primary-purple-dark) !important;
+}
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: var(--primary-purple-dark) !important;
+}
+
+.custom-map-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
+
+.marker-pin {
+  width: 44px;
+  height: 44px;
+  border-radius: 50% 50% 50% 0;
+  background: var(--primary-purple);
+  border: 2px solid white;
+  transform: rotate(-45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  transition: all var(--transition-fast);
+}
+
+.marker-code {
+  transform: rotate(45deg);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.marker-shadow {
+  width: 16px;
+  height: 4px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 50%;
+  margin-top: 2px;
+  filter: blur(1px);
+}
+
+.custom-map-marker.highlighted .marker-pin {
+  background: var(--secondary-pink);
+  transform: rotate(-45deg) scale(1.15);
+  box-shadow: 0 0 15px rgba(255, 102, 179, 0.6);
+  border-color: white;
+}
+
+.custom-map-marker:hover .marker-pin {
+  transform: rotate(-45deg) scale(1.1);
+  background: var(--secondary-pink);
+}
+
+.place-detail-floating-card {
+  position: absolute;
+  bottom: 1.25rem;
+  left: 1.25rem;
+  right: 1.25rem;
+  background-color: rgba(26, 17, 43, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: var(--radius-xl);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-lg);
+  z-index: 30;
+  text-align: left;
+  animation: slideUp var(--transition-normal) forwards;
+}
+
+.close-floating-card-btn {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.8rem;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.6);
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.close-floating-card-btn:hover {
+  color: white;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+
+.detail-code {
+  background-color: var(--secondary-pink);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+}
+
+.detail-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: white;
+}
+
+.place-detail-floating-card p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin: 0 0 0.5rem 0;
+}
+
+.detail-rooms {
+  font-size: 0.75rem;
+  color: var(--primary-pink);
+}
+
+@media (max-width: 1024px) {
+  .map-page-container {
+    flex-direction: column-reverse;
+  }
+
+  .map-sidebar {
+    width: 100%;
+    height: 220px;
+    border-right: none;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .places-list {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.75rem;
+    gap: 0.75rem;
+    white-space: nowrap;
+  }
+
+  .places-list::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .place-list-item {
+    display: inline-block;
+    width: 260px;
+    vertical-align: top;
+    white-space: normal;
+    flex-shrink: 0;
+    padding: 0.75rem;
+  }
+
+  .place-detail-floating-card {
+    bottom: 0.5rem;
+    left: 0.5rem;
+    right: 0.5rem;
+    padding: 1rem;
+  }
+}
+
+body:has(.map-page-container) .app-main {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 1025px) {
+  body:has(.map-page-container) .app-main {
+    max-width: 1600px;
+    padding-bottom: 90px;
+  }
+}
+
+.location-link:hover {
+  text-decoration: underline !important;
+  opacity: 0.95;
 }

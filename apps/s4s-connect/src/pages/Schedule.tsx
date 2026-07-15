@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { Link } from '@tanstack/react-router'
 import { trpc } from '../trpc'
 
 const HOURS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19] // 12 hours from 08:00 to 20:00
@@ -213,9 +214,15 @@ export default function Schedule() {
 
                         <div className="card-meta-row">
                           {slot.location && (
-                            <span className="card-meta-item">
+                            <Link
+                              to="/map"
+                              search={{ places: slot.location.split(' ')[0] } as any}
+                              className="card-meta-item location-link"
+                              style={{ color: 'inherit', textDecoration: 'none', cursor: 'pointer' }}
+                              title="Voir sur le plan"
+                            >
                               📍 {slot.location}
-                            </span>
+                            </Link>
                           )}
                           {(slot.speaker || slot.assistant || slot.rc) && (
                             <span
