@@ -303,3 +303,334 @@ body {
   stroke: var(--secondary-pink);
   filter: drop-shadow(0 0 5px rgba(255, 102, 179, 0.4));
 }
+
+/* ========================================== */
+/* Calendar Timeline Grid (Match gest4s)      */
+/* ========================================== */
+
+.schedule-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+  padding-top: 1.25rem; /* prevent top overflow */
+  animation: fadeIn var(--transition-normal);
+  height: 100%;
+  min-height: 0;
+}
+
+.schedule-header {
+  text-align: left;
+  margin-bottom: 0.25rem;
+}
+
+.schedule-header h1 {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: white;
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.schedule-header .subtitle {
+  color: var(--primary-pink);
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+  opacity: 0.8;
+}
+
+body:has(.schedule-container) .app-main {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-container {
+  flex: 1;
+  overflow: auto;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  box-sizing: border-box;
+  min-height: 350px;
+  max-height: calc(100vh - 260px);
+}
+
+/* Custom scrollbars */
+.calendar-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.calendar-container::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 9999px;
+}
+.calendar-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
+}
+.calendar-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.calendar-grid {
+  display: grid;
+  position: relative;
+  min-width: max-content;
+  width: max-content;
+}
+
+.corner-header {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 25;
+  background: var(--primary-purple-dark);
+  height: 60px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  box-sizing: border-box;
+}
+
+.day-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--primary-purple-dark);
+  height: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  box-sizing: border-box;
+}
+
+.day-header .day-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.day-header .day-subtitle {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 0.1rem;
+}
+
+.time-column-grid {
+  position: sticky;
+  left: 0;
+  z-index: 15;
+  background: var(--primary-purple-dark);
+  border-right: 1px solid rgba(255, 255, 255, 0.15);
+  box-sizing: border-box;
+}
+
+.time-grid-cell {
+  height: 80px; /* HOUR_HEIGHT */
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 6px;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  box-sizing: border-box;
+}
+
+.day-body-column {
+  position: relative;
+  height: 960px; /* 12 hours * 80px */
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  box-sizing: border-box;
+}
+
+.hour-grid-cell {
+  height: 80px; /* HOUR_HEIGHT */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  box-sizing: border-box;
+}
+
+.cards-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+/* Absolute card styling */
+.slot-card-absolute {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  border-radius: 6px;
+  border-left: 4px solid #7376c4;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+  padding: 0.45rem 0.6rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+  z-index: 2;
+  pointer-events: auto;
+  text-align: left;
+}
+
+.slot-card-absolute:hover {
+  z-index: 10;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  transform: scale(1.03);
+}
+
+/* Card Types */
+.slot-card-absolute.lecture {
+  border-left-color: #8e44ad;
+  background-color: #f5eef8;
+  color: #6c3483;
+}
+.slot-card-absolute.exercise {
+  border-left-color: #2980b9;
+  background-color: #ebf5fb;
+  color: #1f618d;
+}
+.slot-card-absolute.workshop {
+  border-left-color: #27ae60;
+  background-color: #e8f8f5;
+  color: #117864;
+}
+.slot-card-absolute.activity {
+  border-left-color: #d35400;
+  background-color: #fdf2e9;
+  color: #a04000;
+}
+.slot-card-absolute.free {
+  border-left-color: #7f8c8d;
+  background-color: #f2f3f4;
+  color: #5d6d7e;
+}
+.slot-card-absolute.special {
+  border-left-color: #c0392b;
+  background-color: #f9ebea;
+  color: #922b21;
+}
+.slot-card-absolute.meal {
+  border-left-color: #16a085;
+  background-color: #e8f8f5;
+  color: #0e6251;
+}
+
+/* Live Slot Highlight (Solid border outline, no glow) */
+.slot-card-absolute.live-slot {
+  border-color: var(--secondary-pink) !important;
+  background-color: #fffafc !important;
+  border-left-width: 6px !important;
+}
+
+.live-badge-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background-color: var(--secondary-pink);
+  border-radius: 50%;
+  margin-left: 0.3rem;
+}
+
+.card-time {
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0.85;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.card-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  opacity: 0.85;
+  margin-top: auto;
+}
+
+.card-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+/* Adjust layout on desktop vs mobile for schedule container */
+@media (min-width: 1024px) {
+  body:has(.schedule-container) .app-main {
+    max-width: 1400px;
+    padding-bottom: 90px; /* Keep enough bottom spacing to clear center nav bar */
+  }
+}
+
+/* Skeletons */
+.skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.06) 75%);
+  background-size: 200% 100%;
+  animation: loadingSkeleton 1.5s infinite;
+  border-radius: 4px;
+}
+
+.skeleton-title {
+  height: 28px;
+  width: 150px;
+  margin-bottom: 8px;
+}
+
+.skeleton-subtitle {
+  height: 16px;
+  width: 250px;
+}
+
+.skeleton-tabs {
+  display: flex;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.skeleton-tab {
+  height: 50px;
+  width: 90px;
+  border-radius: var(--radius-lg);
+}
+
+.skeleton-card {
+  height: 80px;
+  width: 100%;
+  border-radius: var(--radius-lg);
+  margin-bottom: 0.85rem;
+}
+
+@keyframes loadingSkeleton {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
