@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["driverAdapters"]
@@ -10,7 +7,190 @@ datasource db {
   provider = "postgresql"
 }
 
-// ─── ENUMS ────────────────────────────────────────────────────────────────────
+model User {
+  id                String         @id @default(uuid())
+  email             String         @unique
+  password          String
+  firstName         String
+  lastName          String
+  role              Role           @default(PARTICIPANT)
+  sectionId         String?
+  createdAt         DateTime       @default(now())
+  telegramChatId    String?        @unique
+  telegramUsername  String?        @unique
+  reportedIncidents Incident[]     @relation("ReportedIncidents")
+  pollResponses     PollResponse[]
+  staffProfile      StaffMember?
+  section           Section?       @relation(fields: [sectionId], references: [id])
+  assignedIncidents Incident[]     @relation("AssignedIncidents")
+}
+
+model Section {
+  id            String         @id @default(uuid())
+  name          String
+  scheduleSlots ScheduleSlot[]
+  users         User[]
+  Class         Class[]
+}
+
+model ScheduleSlot {
+  id          String       @id @default(uuid())
+  title       String
+  description String?
+  startTime   DateTime
+  endTime     DateTime
+  location    String?
+  sectionId   String?
+  type        ScheduleType
+  assistantId String?
+  speakerId   String?
+  rcId        String?
+  assistant   StaffMember? @relation("AssistantSlots", fields: [assistantId], references: [id])
+  rc          StaffMember? @relation("RcSlots", fields: [rcId], references: [id])
+  section     Section?     @relation(fields: [sectionId], references: [id])
+  speaker     StaffMember? @relation("SpeakerSlots", fields: [speakerId], references: [id])
+}
+
+model StaffMember {
+  id                     String           @id @default(uuid())
+  userId                 String?          @unique
+  firstName              String
+  lastName               String
+  role                   String
+  status                 StaffStatus      @default(ACTIVE)
+  isPresent              Boolean          @default(false)
+  telegramUsername       String?
+  telegramChatId         String?
+  phone                  String?
+  email                  String?
+  createdAt              DateTime         @default(now())
+  score                  Int              @default(0)
+  assistantSlots         ScheduleSlot[]   @relation("AssistantSlots")
+  rcSlots                ScheduleSlot[]   @relation("RcSlots")
+  speakerSlots           ScheduleSlot[]   @relation("SpeakerSlots")
+  shifts                 Shift[]
+  user                   User?            @relation(fields: [userId], references: [id])
+  taskAssignments        TaskAssignment[]
+  Class_AssistantClasses Class[]          @relation("AssistantClasses")
+  Class_RcClasses        Class[]          @relation("RcClasses")
+  Class_SpeakerClasses   Class[]          @relation("SpeakerClasses")
+}
+
+model Shift {
+  id            String      @id @default(uuid())
+  staffMemberId String
+  startTime     DateTime
+  endTime       DateTime
+  location      String?
+  notes         String?
+  staffMember   StaffMember @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+}
+
+model Task {
+  id          String           @id @default(uuid())
+  name        String
+  description String?
+  category    TaskCategory
+  startTime   DateTime
+  endTime     DateTime
+  location    String?
+  status      TaskStatus       @default(PENDING)
+  priority    Priority         @default(MEDIUM)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  assignments TaskAssignment[]
+}
+
+model TaskAssignment {
+  id            String      @id @default(uuid())
+  taskId        String
+  staffMemberId String
+  staffMember   StaffMember @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+  task          Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, staffMemberId])
+}
+
+model Incident {
+  id           String         @id @default(uuid())
+  title        String
+  description  String
+  severity     Severity       @default(LOW)
+  status       IncidentStatus @default(OPEN)
+  reportedById String
+  createdAt    DateTime       @default(now())
+  category     String?
+  location     String?
+  updatedAt    DateTime       @updatedAt
+  reportedBy   User           @relation("ReportedIncidents", fields: [reportedById], references: [id])
+  assignedTo   User[]         @relation("AssignedIncidents")
+}
+
+model Poll {
+  id         String         @id @default(uuid())
+  question   String
+  targetRole Role
+  active     Boolean        @default(true)
+  createdAt  DateTime       @default(now())
+  options    PollOption[]
+  responses  PollResponse[]
+}
+
+model PollOption {
+  id        String         @id @default(uuid())
+  label     String
+  pollId    String
+  poll      Poll           @relation(fields: [pollId], references: [id])
+  responses PollResponse[]
+}
+
+model PollResponse {
+  id       String     @id @default(uuid())
+  userId   String
+  pollId   String
+  optionId String
+  option   PollOption @relation(fields: [optionId], references: [id])
+  poll     Poll       @relation(fields: [pollId], references: [id])
+  user     User       @relation(fields: [userId], references: [id])
+
+  @@unique([userId, pollId])
+}
+
+model File {
+  id          String    @id @default(uuid())
+  name        String
+  mimeType    String
+  size        Int
+  bucket      String
+  key         String
+  uploadedAt  DateTime  @default(now())
+  availableAt DateTime?
+  folderId    String?
+  classId     String?
+  Class       Class?    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  Folder      Folder?   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+}
+
+model Class {
+  id                           String        @id
+  name                         String
+  createdAt                    DateTime      @default(now())
+  File                         File[]
+  Folder                       Folder[]
+  StaffMember_AssistantClasses StaffMember[] @relation("AssistantClasses")
+  Section                      Section[]
+  StaffMember_RcClasses        StaffMember[] @relation("RcClasses")
+  StaffMember_SpeakerClasses   StaffMember[] @relation("SpeakerClasses")
+}
+
+model Folder {
+  id        String   @id
+  name      String
+  createdAt DateTime @default(now())
+  classId   String
+  File      File[]
+  Class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+}
 
 enum Role {
   PARTICIPANT
@@ -68,176 +248,25 @@ enum StaffStatus {
   ON_LEAVE
 }
 
-// ─── CORE MODELS ──────────────────────────────────────────────────────────────
+// ─── WORKSHOPS ────────────────────────────────────────────────────────────────
 
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  firstName String
-  lastName  String
-  role             Role     @default(PARTICIPANT)
-  sectionId        String?
-  section          Section? @relation(fields: [sectionId], references: [id])
-  telegramUsername String?  @unique // e.g. "@johndoe" — validated at API layer
-  telegramChatId   String?  @unique // set by the bot on first /start
-  createdAt        DateTime @default(now())
-
-  pollResponses     PollResponse[]
-  reportedIncidents Incident[]     @relation("ReportedIncidents")
-  assignedIncidents Incident[]     @relation("AssignedIncidents")
-  staffProfile      StaffMember?
+model Workshop {
+  id                   String            @id @default(uuid())
+  title                String
+  location             String
+  description          String
+  image                String?           // image URL or path
+  requiresRegistration Boolean           @default(false)
+  maxParticipants      Int?              // Null means unlimited or not applicable
+  dates                WorkshopSession[]
+  createdAt            DateTime          @default(now())
 }
 
-model Section {
-  id            String         @id @default(uuid())
-  name          String
-  users         User[]
-  scheduleSlots ScheduleSlot[]
-}
-
-// ─── SCHEDULE ─────────────────────────────────────────────────────────────────
-
-model ScheduleSlot {
-  id          String       @id @default(uuid())
-  title       String
-  description String?
-  type        ScheduleType
-  startTime   DateTime
-  endTime     DateTime
-  location    String?
-  sectionId   String?
-  section     Section?     @relation(fields: [sectionId], references: [id])
-  speakerId   String?
-  speaker     StaffMember? @relation("SpeakerSlots", fields: [speakerId], references: [id])
-  assistantId String?
-  assistant   StaffMember? @relation("AssistantSlots", fields: [assistantId], references: [id])
-  rcId        String?
-  rc          StaffMember? @relation("RcSlots", fields: [rcId], references: [id])
-}
-
-// ─── STAFF ────────────────────────────────────────────────────────────────────
-
-// Represents a physical staff member, optionally linked to a User account
-model StaffMember {
-  id        String      @id @default(uuid())
-  userId    String?     @unique
-  user      User?       @relation(fields: [userId], references: [id])
-  firstName String
-  lastName  String
-  role      String
-  status    StaffStatus @default(ACTIVE)
-  isPresent        Boolean @default(false)
-  telegramUsername String?
-  telegramChatId   String?
-  phone            String?
-  email     String?
-  score     Int         @default(0)
-  createdAt DateTime    @default(now())
-
-  shifts          Shift[]
-  taskAssignments TaskAssignment[]
-  speakerSlots    ScheduleSlot[] @relation("SpeakerSlots")
-  assistantSlots  ScheduleSlot[] @relation("AssistantSlots")
-  rcSlots         ScheduleSlot[] @relation("RcSlots")
-}
-
-// A shift is a scheduled time block for a staff member
-model Shift {
-  id            String      @id @default(uuid())
-  staffMemberId String
-  staffMember   StaffMember @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
-  startTime     DateTime
-  endTime       DateTime
-  location      String?
-  notes         String?
-}
-
-// ─── TASKS ────────────────────────────────────────────────────────────────────
-
-model Task {
-  id          String       @id @default(uuid())
-  name        String
-  description String?
-  category    TaskCategory
-  startTime   DateTime
-  endTime     DateTime
-  location    String?
-  status      TaskStatus   @default(PENDING)
-  priority    Priority     @default(MEDIUM)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  assignments TaskAssignment[]
-}
-
-model TaskAssignment {
-  id            String      @id @default(uuid())
-  taskId        String
-  task          Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  staffMemberId String
-  staffMember   StaffMember @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
-
-  @@unique([taskId, staffMemberId])
-}
-
-// ─── INCIDENTS ────────────────────────────────────────────────────────────────
-
-model Incident {
-  id           String         @id @default(uuid())
-  title        String
-  description  String
-  location     String?
-  category     String?
-  severity     Severity       @default(LOW)
-  status       IncidentStatus @default(OPEN)
-  reportedById String
-  reportedBy   User           @relation("ReportedIncidents", fields: [reportedById], references: [id])
-  assignedTo   User[]         @relation("AssignedIncidents")
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-}
-
-// ─── POLLS ────────────────────────────────────────────────────────────────────
-
-model Poll {
-  id         String         @id @default(uuid())
-  question   String
-  targetRole Role
-  active     Boolean        @default(true)
-  createdAt  DateTime       @default(now())
-  options    PollOption[]
-  responses  PollResponse[]
-}
-
-model PollOption {
-  id        String         @id @default(uuid())
-  label     String
-  pollId    String
-  poll      Poll           @relation(fields: [pollId], references: [id])
-  responses PollResponse[]
-}
-
-model PollResponse {
-  id       String     @id @default(uuid())
-  userId   String
-  pollId   String
-  optionId String
-  user     User       @relation(fields: [userId], references: [id])
-  poll     Poll       @relation(fields: [pollId], references: [id])
-  option   PollOption @relation(fields: [optionId], references: [id])
-
-  @@unique([userId, pollId])
-}
-
-// ─── FILES ────────────────────────────────────────────────────────────────────
-
-model File {
+model WorkshopSession {
   id         String   @id @default(uuid())
-  name       String
-  mimeType   String
-  size       Int
-  bucket     String
-  key        String
-  uploadedAt DateTime @default(now())
+  workshopId String
+  workshop   Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  startTime  DateTime
+  endTime    DateTime
 }
+

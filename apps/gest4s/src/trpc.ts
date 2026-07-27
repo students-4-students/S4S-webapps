@@ -22,7 +22,7 @@ export function makeTrpcClient() {
         condition: (op) => op.type === 'subscription',
         true: httpSubscriptionLink({
           url: 'http://localhost:3001/trpc',
-          headers: getHeaders,
+          connectionParams: getHeaders,
         }),
         false: httpBatchLink({
           url: 'http://localhost:3001/trpc',
