@@ -20,6 +20,16 @@ interface Workshop {
   dates: WorkshopSession[]
 }
 
+interface Participant {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  sectionName?: string
+  sessionId?: string
+  sessionTime?: string
+  isPresent: boolean
+}
 // Format Date object or ISO string to 'YYYY-MM-DDTHH:mm' in local timezone
 function toLocalDatetimeString(dateVal: Date | string): string {
   const d = typeof dateVal === 'string' ? new Date(dateVal) : dateVal
@@ -37,6 +47,40 @@ function toLocalDatetimeString(dateVal: Date | string): string {
 function toISOStringFromLocal(localStr: string): string {
   const d = new Date(localStr)
   return d.toISOString()
+}
+
+// Format date-time range in French Switzerland locale
+function formatDateTimeRange(startTimeVal: string | Date, endTimeVal: string | Date): string {
+  const start = new Date(startTimeVal)
+  const end = new Date(endTimeVal)
+  const locale = 'fr-CH'
+  
+  const isSameDay = start.toDateString() === end.toDateString()
+  
+  const startStr = start.toLocaleString(locale, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+  
+  if (isSameDay) {
+    const endStr = end.toLocaleTimeString(locale, {
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+    return `${startStr} - ${endStr}`
+  } else {
+    const endStr = end.toLocaleString(locale, {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+    return `${startStr} - ${endStr}`
+  }
 }
 
 export default function Workshops() {
@@ -61,10 +105,144 @@ export default function Workshops() {
   const [maxParticipants, setMaxParticipants] = useState<number | ''>('')
   const [dates, setDates] = useState<{ startTime: string; endTime: string }[]>([])
 
+  // Participants Modal State
+  const [usersModalWorkshop, setUsersModalWorkshop] = useState<Workshop | null>(null)
+  const [usersSearchQuery, setUsersSearchQuery] = useState('')
+  const [usersSessionFilter, setUsersSessionFilter] = useState('all')
+
+  // Manual participant add state
+  const [showAddParticipantForm, setShowAddParticipantForm] = useState(false)
+  const [selectedStudentId, setSelectedStudentId] = useState('')
+  const [selectedSlotId, setSelectedSlotId] = useState('')
+  const [studentSearchQuery, setStudentSearchQuery] = useState('')
+
+  const [participantsMap, setParticipantsMap] = useState<Record<string, Participant[]>>(() => {
+    try {
+      const saved = localStorage.getItem('gest4s_workshop_participants')
+      return saved ? JSON.parse(saved) : {}
+    } catch {
+      return {}
+    }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('gest4s_workshop_participants', JSON.stringify(participantsMap))
+    } catch (err) {
+      console.error('Failed to save participants map:', err)
+    }
+  }, [participantsMap])
+
   const utils = trpc.useUtils()
 
   // Queries & Mutations
   const { data: workshops = [], isLoading } = trpc.workshops.list.useQuery()
+  const { data: dbStudents = [] } = trpc.students.list.useQuery(undefined, {
+    retry: false,
+    staleTime: 60000,
+  })
+
+  const filteredDbStudents = useMemo(() => {
+    if (!studentSearchQuery.trim()) return dbStudents
+    const query = studentSearchQuery.toLowerCase()
+    return dbStudents.filter((s: any) =>
+      `${s.firstName} ${s.lastName}`.toLowerCase().includes(query) ||
+      (s.email && s.email.toLowerCase().includes(query)) ||
+      (s.section?.name && s.section.name.toLowerCase().includes(query))
+    )
+  }, [dbStudents, studentSearchQuery])
+
+  const getWorkshopParticipants = (workshop: Workshop): Participant[] => {
+    // Read real DB registrations returned from the workshops router
+    const dbRegistrations: Participant[] = (workshop.dates || []).flatMap((d: any) =>
+      (d.registrations || []).map((r: any) => ({
+        id: r.id,
+        firstName: r.firstName || r.user?.firstName || 'Étudiant',
+        lastName: r.lastName || r.user?.lastName || 'Inscrit',
+        email: r.email || r.user?.email || 'N/A',
+        sectionName: r.user?.section?.name || 'IN',
+        sessionId: d.id,
+        sessionTime: formatDateTimeRange(d.startTime, d.endTime),
+        isPresent: Boolean(r.isPresent),
+      }))
+    )
+
+    // If staff added manual participants in React state, combine them
+    const localList = participantsMap[workshop.id] || []
+    const combinedMap = new Map<string, Participant>()
+
+    dbRegistrations.forEach(p => combinedMap.set(p.id, p))
+    localList.forEach(p => combinedMap.set(p.id, p))
+
+    return Array.from(combinedMap.values())
+  }
+
+  const registerMutation = trpc.workshops.register.useMutation({
+    onSuccess: () => {
+      utils.workshops.list.invalidate()
+    },
+  })
+
+  const unregisterMutation = trpc.workshops.unregister.useMutation({
+    onSuccess: () => {
+      utils.workshops.list.invalidate()
+    },
+  })
+
+  const handleAddParticipantSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!usersModalWorkshop || !selectedStudentId) return
+    const found = dbStudents.find((s: any) => s.id === selectedStudentId)
+    if (!found) return
+    const targetSessionId = selectedSlotId || (usersSessionFilter !== 'all' ? usersSessionFilter : (usersModalWorkshop.dates[0]?.id))
+    if (targetSessionId) {
+      registerMutation.mutate({
+        sessionId: targetSessionId,
+        firstName: found.firstName,
+        lastName: found.lastName,
+        email: found.email,
+      })
+    }
+    setSelectedStudentId('')
+    setSelectedSlotId('')
+    setStudentSearchQuery('')
+    setShowAddParticipantForm(false)
+  }
+
+  const removeParticipant = (workshopId: string, participantId: string) => {
+    if (!usersModalWorkshop) return
+    const currentList = getWorkshopParticipants(usersModalWorkshop)
+    const target = currentList.find(p => p.id === participantId)
+    if (target && target.sessionId) {
+      unregisterMutation.mutate({
+        sessionId: target.sessionId,
+        email: target.email,
+      })
+    }
+    const updated = currentList.filter(p => p.id !== participantId)
+    setParticipantsMap(prev => ({ ...prev, [workshopId]: updated }))
+  }
+
+  const exportParticipantsCSV = (workshop: Workshop, list: Participant[]) => {
+    const headers = ['Prénom', 'Nom', 'Email', 'Section', 'Session', 'Statut Émargement']
+    const rows = list.map(p => [
+      `"${p.firstName}"`,
+      `"${p.lastName}"`,
+      `"${p.email}"`,
+      `"${p.sectionName || 'N/A'}"`,
+      `"${p.sessionTime || 'Toutes les sessions'}"`,
+      `"${p.isPresent ? 'Présent' : 'Attendu'}"`,
+    ])
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `participants_${workshop.title.replace(/[^a-zA-Z0-9]/g, '_')}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 
   // Real-time Updates via tRPC Subscription
   trpc.workshops.onUpdated.useSubscription(undefined, {
@@ -99,13 +277,14 @@ export default function Workshops() {
   // Keyboard shortcut (Escape to close modal)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showModal) {
-        closeModal()
+      if (e.key === 'Escape') {
+        if (usersModalWorkshop) setUsersModalWorkshop(null)
+        else if (showModal) closeModal()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showModal])
+  }, [showModal, usersModalWorkshop])
 
   const openCreateModal = () => {
     setEditingWorkshop(null)
@@ -149,6 +328,13 @@ export default function Workshops() {
       }))
     )
     setShowModal(true)
+  }
+
+  const openUsersModal = (w: Workshop) => {
+    setUsersModalWorkshop(w)
+    setUsersSearchQuery('')
+    setUsersSessionFilter('all')
+    setShowAddParticipantForm(false)
   }
 
   const closeModal = () => {
@@ -280,40 +466,6 @@ export default function Workshops() {
     }
   }
 
-  // Format date-time range in French Switzerland locale
-  const formatDateTimeRange = (startTimeVal: string | Date, endTimeVal: string | Date) => {
-    const start = new Date(startTimeVal)
-    const end = new Date(endTimeVal)
-    const locale = 'fr-CH'
-    
-    const isSameDay = start.toDateString() === end.toDateString()
-    
-    const startStr = start.toLocaleString(locale, {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-    
-    if (isSameDay) {
-      const endStr = end.toLocaleTimeString(locale, {
-        hour: '2-digit',
-        minute: '2-digit'
-      })
-      return `${startStr} - ${endStr}`
-    } else {
-      const endStr = end.toLocaleString(locale, {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-      return `${startStr} - ${endStr}`
-    }
-  }
-
   // Filtered Workshops
   const filteredWorkshops = useMemo(() => {
     const now = new Date().getTime()
@@ -348,6 +500,25 @@ export default function Workshops() {
   }, [workshops, searchQuery, registrationFilter, timeFilter])
 
   const hasActiveFilters = searchQuery !== '' || registrationFilter !== 'all' || timeFilter !== 'all'
+
+  // Active Participants List for Modal
+  const currentWorkshopParticipants = useMemo(() => {
+    if (!usersModalWorkshop) return []
+    return getWorkshopParticipants(usersModalWorkshop)
+  }, [usersModalWorkshop, participantsMap, dbStudents])
+
+  const filteredParticipants = useMemo(() => {
+    return currentWorkshopParticipants.filter(p => {
+      const matchesSearch = !usersSearchQuery ||
+        p.firstName.toLowerCase().includes(usersSearchQuery.toLowerCase()) ||
+        p.lastName.toLowerCase().includes(usersSearchQuery.toLowerCase()) ||
+        p.email.toLowerCase().includes(usersSearchQuery.toLowerCase()) ||
+        (p.sectionName && p.sectionName.toLowerCase().includes(usersSearchQuery.toLowerCase()))
+
+      const matchesSession = usersSessionFilter === 'all' || p.sessionId === usersSessionFilter
+      return matchesSearch && matchesSession
+    })
+  }, [currentWorkshopParticipants, usersSearchQuery, usersSessionFilter])
 
   return (
     <div className="workshops-page">
@@ -455,6 +626,7 @@ export default function Workshops() {
               const sortedDates = [...(w.dates || [])].sort(
                 (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
               )
+              const participantsList = getWorkshopParticipants(w)
 
               return (
                 <div key={w.id} className="workshop-card">
@@ -513,6 +685,13 @@ export default function Workshops() {
                     </div>
 
                     <div className="workshop-actions">
+                      <button
+                        className="btn-icon btn-participants"
+                        onClick={() => openUsersModal(w)}
+                        title="Voir les inscrits"
+                      >
+                        👥 Inscrits ({participantsList.length})
+                      </button>
                       <button
                         className="btn-icon btn-edit"
                         onClick={() => openEditModal(w)}
@@ -759,6 +938,211 @@ export default function Workshops() {
           </div>
         </div>
       )}
+
+      {/* Participants List Modal */}
+      {usersModalWorkshop && (
+        <div className="modal-overlay" onClick={() => setUsersModalWorkshop(null)}>
+          <div className="modal participants-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="header-title-group">
+                <h2>👥 Liste des participants inscrits</h2>
+                <p className="modal-subtitle">{usersModalWorkshop.title} - 📍 {usersModalWorkshop.location}</p>
+              </div>
+              <button className="close-btn" onClick={() => setUsersModalWorkshop(null)}>✕</button>
+            </div>
+
+            <div className="modal-body participants-modal-body">
+              {/* Stat Summary Bar */}
+              <div className="participants-summary-bar">
+                <div className="summary-stat">
+                  <span className="stat-label">Inscrits totaux</span>
+                  <span className="stat-val">
+                    {currentWorkshopParticipants.length} {usersModalWorkshop.maxParticipants ? `/ ${usersModalWorkshop.maxParticipants} max` : ''}
+                  </span>
+                </div>
+              </div>
+
+              {/* Toolbar */}
+              <div className="participants-toolbar">
+                <div className="search-box">
+                  <span className="search-icon">🔍</span>
+                  <input
+                    type="text"
+                    placeholder="Rechercher par nom, email, section..."
+                    value={usersSearchQuery}
+                    onChange={(e) => setUsersSearchQuery(e.target.value)}
+                  />
+                  {usersSearchQuery && (
+                    <button className="clear-search-btn" onClick={() => setUsersSearchQuery('')}>✕</button>
+                  )}
+                </div>
+
+                <select
+                  value={usersSessionFilter}
+                  onChange={(e) => setUsersSessionFilter(e.target.value)}
+                  className="participants-select-filter"
+                >
+                  <option value="all">Toutes les sessions ({usersModalWorkshop.dates.length})</option>
+                  {usersModalWorkshop.dates.map((d, idx) => (
+                    <option key={d.id} value={d.id}>
+                      Session #{idx + 1}: {formatDateTimeRange(d.startTime, d.endTime)}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  className="btn-export-csv"
+                  onClick={() => exportParticipantsCSV(usersModalWorkshop, filteredParticipants)}
+                  title="Exporter la liste en CSV"
+                >
+                  📥 Exporter CSV
+                </button>
+              </div>
+
+              {/* Manual Add Form */}
+              {showAddParticipantForm ? (
+                <form className="quick-add-participant-form" onSubmit={handleAddParticipantSubmit}>
+                  <h4>➕ Inscrire un étudiant de la base de données</h4>
+
+                  {/* Student Search & Select */}
+                  <div className="form-group-full">
+                    <label className="field-label">Rechercher et choisir l'étudiant :</label>
+                    <div className="search-box mb-2">
+                      <span className="search-icon">🔍</span>
+                      <input
+                        type="text"
+                        placeholder="Rechercher par prénom, nom, email ou section..."
+                        value={studentSearchQuery}
+                        onChange={(e) => setStudentSearchQuery(e.target.value)}
+                      />
+                      {studentSearchQuery && (
+                        <button className="clear-search-btn" type="button" onClick={() => setStudentSearchQuery('')}>
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    <select
+                      value={selectedStudentId}
+                      onChange={(e) => setSelectedStudentId(e.target.value)}
+                      className="participants-select-filter full-width"
+                      required
+                    >
+                      <option value="">-- Sélectionner un étudiant ({filteredDbStudents.length} trouvés) --</option>
+                      {filteredDbStudents.map((s: any) => (
+                        <option key={s.id} value={s.id}>
+                          👤 {s.firstName} {s.lastName} — {s.email} ({s.section?.name || 'N/A'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Slot / Session Select */}
+                  <div className="form-group-full">
+                    <label className="field-label">Sélectionner le créneau / session :</label>
+                    <select
+                      value={selectedSlotId || (usersSessionFilter !== 'all' ? usersSessionFilter : (usersModalWorkshop.dates[0]?.id || ''))}
+                      onChange={(e) => setSelectedSlotId(e.target.value)}
+                      className="participants-select-filter full-width"
+                      required
+                    >
+                      {usersModalWorkshop.dates.map((d, idx) => (
+                        <option key={d.id} value={d.id}>
+                          📅 Créneau #{idx + 1} : {formatDateTimeRange(d.startTime, d.endTime)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-actions-inline">
+                    <button type="submit" className="btn-save" disabled={!selectedStudentId}>
+                      ➕ Inscrire à la session
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-cancel"
+                      onClick={() => {
+                        setShowAddParticipantForm(false)
+                        setSelectedStudentId('')
+                        setSelectedSlotId('')
+                        setStudentSearchQuery('')
+                      }}
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <button className="btn-add-participant-trigger" onClick={() => setShowAddParticipantForm(true)}>
+                  + Inscrire un étudiant manuellement
+                </button>
+              )}
+
+              {/* Table */}
+              <div className="participants-table-container">
+                {filteredParticipants.length === 0 ? (
+                  <div className="empty-participants-state">
+                    <p>Aucun participant inscrit trouvé.</p>
+                  </div>
+                ) : (
+                  <table className="participants-table">
+                    <thead>
+                      <tr>
+                        <th>Participant</th>
+                        <th>Email</th>
+                        <th>Section</th>
+                        <th>Session</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredParticipants.map((p) => (
+                        <tr key={p.id}>
+                          <td>
+                            <div className="participant-user-info">
+                              <div className="avatar-circle">
+                                {p.firstName[0]}{p.lastName[0]}
+                              </div>
+                              <span className="participant-name">{p.firstName} {p.lastName}</span>
+                            </div>
+                          </td>
+                          <td className="cell-email">{p.email}</td>
+                          <td>
+                            <span className="badge-section">{p.sectionName || 'N/A'}</span>
+                          </td>
+                          <td className="cell-session">
+                            {p.sessionTime ? (
+                              <span className="session-tag">📅 {p.sessionTime}</span>
+                            ) : (
+                              <span className="session-tag">Toutes sessions</span>
+                            )}
+                          </td>
+                          <td>
+                            <button
+                              className="btn-remove-participant"
+                              onClick={() => removeParticipant(usersModalWorkshop.id, p.id)}
+                              title="Désinscrire cet étudiant"
+                            >
+                              ✕ Désinscrire
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setUsersModalWorkshop(null)}>
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+

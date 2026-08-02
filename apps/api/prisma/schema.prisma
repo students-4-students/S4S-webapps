@@ -8,21 +8,22 @@ datasource db {
 }
 
 model User {
-  id                String         @id @default(uuid())
-  email             String         @unique
-  password          String
-  firstName         String
-  lastName          String
-  role              Role           @default(PARTICIPANT)
-  sectionId         String?
-  createdAt         DateTime       @default(now())
-  telegramChatId    String?        @unique
-  telegramUsername  String?        @unique
-  reportedIncidents Incident[]     @relation("ReportedIncidents")
-  pollResponses     PollResponse[]
-  staffProfile      StaffMember?
-  section           Section?       @relation(fields: [sectionId], references: [id])
-  assignedIncidents Incident[]     @relation("AssignedIncidents")
+  id                    String                 @id @default(uuid())
+  email                 String                 @unique
+  password              String
+  firstName             String
+  lastName              String
+  role                  Role                   @default(PARTICIPANT)
+  sectionId             String?
+  createdAt             DateTime               @default(now())
+  telegramChatId        String?                @unique
+  telegramUsername      String?                @unique
+  reportedIncidents     Incident[]             @relation("ReportedIncidents")
+  pollResponses         PollResponse[]
+  staffProfile          StaffMember?
+  section               Section?               @relation(fields: [sectionId], references: [id])
+  assignedIncidents     Incident[]             @relation("AssignedIncidents")
+  workshopRegistrations WorkshopRegistration[]
 }
 
 model Section {
@@ -263,10 +264,27 @@ model Workshop {
 }
 
 model WorkshopSession {
-  id         String   @id @default(uuid())
-  workshopId String
-  workshop   Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
-  startTime  DateTime
-  endTime    DateTime
+  id            String                 @id @default(uuid())
+  workshopId    String
+  workshop      Workshop               @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  startTime     DateTime
+  endTime       DateTime
+  registrations WorkshopRegistration[]
 }
+
+model WorkshopRegistration {
+  id        String          @id @default(uuid())
+  sessionId String
+  session   WorkshopSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  firstName String?
+  lastName  String?
+  email     String?
+  isPresent Boolean         @default(false)
+  createdAt DateTime        @default(now())
+
+  @@unique([sessionId, userId, email])
+}
+
 
