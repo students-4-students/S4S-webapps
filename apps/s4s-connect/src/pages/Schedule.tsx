@@ -233,7 +233,7 @@ export default function Schedule() {
                                 slot.rc && `RC: ${slot.rc.firstName} ${slot.rc.lastName}`
                               ].filter(Boolean).join('\n')}
                             >
-                              👤 {[
+                              {[
                                 slot.speaker && slot.speaker.lastName,
                                 slot.assistant && slot.assistant.lastName,
                                 slot.rc && slot.rc.lastName

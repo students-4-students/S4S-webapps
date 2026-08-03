@@ -986,7 +986,7 @@ export default function Workshops() {
                       <option value="">-- Sélectionner un étudiant ({filteredDbStudents.length} trouvés) --</option>
                       {filteredDbStudents.map((s: any) => (
                         <option key={s.id} value={s.id}>
-                          👤 {s.firstName} {s.lastName} — {s.email} ({s.section?.name || 'N/A'})
+                          {s.firstName} {s.lastName} — {s.email} ({s.section?.name || 'N/A'})
                         </option>
                       ))}
                     </select>

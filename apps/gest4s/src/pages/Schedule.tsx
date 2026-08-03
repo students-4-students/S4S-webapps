@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Link } from '@tanstack/react-router'
 import { trpc } from '../trpc'
 import CreateClassModal from '../components/CreateClassModal'
@@ -52,6 +52,37 @@ function Schedule() {
 
   const { data: slots, isLoading: loadingSlots, error: errorSlots } = trpc.schedules.list.useQuery()
   const { data: staffs, isLoading: loadingStaffs } = trpc.staffs.list.useQuery()
+  const { data: tasks = [] } = trpc.tasks.list.useQuery()
+
+  // Map operational tasks assigned to staff members so they show up on their schedule
+  const mappedTaskSlots = useMemo(() => {
+    if (!tasks || tasks.length === 0) return []
+    const mapped: any[] = []
+
+    tasks.forEach((task: any) => {
+      if (task.assignments && task.assignments.length > 0) {
+        task.assignments.forEach((assignment: any) => {
+          mapped.push({
+            id: `task-${task.id}-${assignment.staffMemberId}`,
+            title: `[${task.category}] ${task.name}`,
+            description: task.description || `Tâche Opérationnelle - Pôle ${task.category}`,
+            startTime: task.startTime,
+            endTime: task.endTime,
+            location: task.location,
+            type: 'SPECIAL' as const,
+            isOperationalTask: true,
+            category: task.category,
+            assignedStaffId: assignment.staffMemberId,
+            speakerId: assignment.staffMemberId,
+            assistantId: null,
+            rcId: null,
+            section: null,
+          })
+        })
+      }
+    })
+    return mapped
+  }, [tasks])
 
   const formatTime = (date: Date | string) => {
     const d = typeof date === 'string' ? new Date(date) : date
@@ -195,7 +226,8 @@ function Schedule() {
 
   // Filter slots for a given day and selected entity
   const getSlotsForDay = (dateStr: string) => {
-    return safeSlots
+    const combinedSlots = [...safeSlots, ...mappedTaskSlots]
+    return combinedSlots
       .filter((slot) => {
         if (getSlotDateStr(slot.startTime) !== dateStr) return false
 
@@ -206,16 +238,17 @@ function Schedule() {
             return !slot.location
           }
           if (!slot.location) return false
-          const rooms = slot.location.split(/[,;/]+/).map((r) => r.trim().toUpperCase()).filter((r) => r.length > 0)
+          const rooms = slot.location.split(/[,;/]+/).map((r: string) => r.trim().toUpperCase()).filter((r: string) => r.length > 0)
           return rooms.includes(activeEntityId.toUpperCase())
         } else if (viewType === 'person') {
           if (activeEntityId === 'none') {
-            return !slot.speakerId && !slot.assistantId && !slot.rcId
+            return !slot.speakerId && !slot.assistantId && !slot.rcId && !slot.assignedStaffId
           }
           return (
             slot.speakerId === activeEntityId ||
             slot.assistantId === activeEntityId ||
-            slot.rcId === activeEntityId
+            slot.rcId === activeEntityId ||
+            slot.assignedStaffId === activeEntityId
           )
         }
         return false
@@ -428,24 +461,48 @@ interface AbsoluteSlotCardProps {
 }
 
 function AbsoluteSlotCard({ slot, style, formatTime, onClick }: AbsoluteSlotCardProps) {
-  const cardTypeClass = slot.type.toLowerCase() // lecture, exercise, workshop, activity, free
+  const cardTypeClass = slot.type.toLowerCase()
+
+  const isOpTask = slot.isOperationalTask
+  const customStyle: React.CSSProperties = isOpTask
+    ? {
+        ...style,
+        borderLeftColor:
+          slot.category === 'LOGISTIQUE'
+            ? '#6366f1'
+            : slot.category === 'MATERIEL'
+            ? '#06b6d4'
+            : slot.category === 'ANIMATION'
+            ? '#10b981'
+            : slot.category === 'PEDAGOGIE'
+            ? '#f59e0b'
+            : '#ec4899',
+        backgroundColor: 'rgba(99, 102, 241, 0.15)',
+        color: 'white',
+      }
+    : style
 
   return (
     <div
       className={`slot-card-absolute ${cardTypeClass}`}
-      style={style}
-      onClick={onClick}
+      style={customStyle}
+      onClick={isOpTask ? undefined : onClick}
       title={`${slot.title}\n🕒 ${formatTime(slot.startTime)} - ${formatTime(slot.endTime)}\n${slot.description || ''}`}
     >
       <div className="card-time">
-        🕒 {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+        <span>🕒 {formatTime(slot.startTime)} - {formatTime(slot.endTime)}</span>
+        {isOpTask && (
+          <span style={{ fontSize: '0.62rem', background: 'rgba(255, 255, 255, 0.2)', padding: '0.05rem 0.3rem', borderRadius: '3px', marginLeft: 'auto' }}>
+            ⚙️ Opération
+          </span>
+        )}
       </div>
-      
+
       <div className="card-title">{slot.title}</div>
-      
+
       <div className="card-meta-row">
         {slot.location && (
-          <span className="card-meta-item" title={`Salle: ${slot.location}`}>
+          <span className="card-meta-item" title={`Lieu: ${slot.location}`}>
             📍 {slot.location}
           </span>
         )}

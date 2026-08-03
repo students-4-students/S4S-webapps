@@ -954,7 +954,7 @@ function TaskCard({
                 fontWeight: 500,
               }}
             >
-              👤 {a.staffMember.firstName}
+              {a.staffMember.firstName}
             </span>
           ))}
         </div>
