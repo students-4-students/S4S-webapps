@@ -5,6 +5,7 @@ import { staffsRouter } from './staffs'
 import { schedulesRouter } from './schedules'
 import { studentsRouter } from './students'
 import { workshopsRouter } from './workshops'
+import { tasksRouter } from './tasks'
 
 export const appRouter = router({
   auth: authRouter,
@@ -13,6 +14,7 @@ export const appRouter = router({
   schedules: schedulesRouter,
   students: studentsRouter,
   workshops: workshopsRouter,
+  tasks: tasksRouter,
 })
 
 export type AppRouter = typeof appRouter

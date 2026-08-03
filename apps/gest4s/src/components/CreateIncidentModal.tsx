@@ -6,11 +6,17 @@ const defaultForm = { title: '', description: '', location: '', category: '', se
 
 interface Props {
   onClose: () => void
+  defaultTitle?: string
+  defaultLocation?: string
 }
 
-function CreateIncidentModal({ onClose }: Props) {
+function CreateIncidentModal({ onClose, defaultTitle = '', defaultLocation = '' }: Props) {
   const utils = trpc.useUtils()
-  const [form, setForm] = useState(defaultForm)
+  const [form, setForm] = useState({
+    ...defaultForm,
+    title: defaultTitle,
+    location: defaultLocation,
+  })
 
   const create = trpc.incidents.create.useMutation({
     onSuccess: () => {

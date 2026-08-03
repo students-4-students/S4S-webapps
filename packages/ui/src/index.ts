@@ -12,6 +12,7 @@ export * from './components/LoadingSpinner'
 export * from './components/StatCard'
 export * from './components/PageHeader'
 export * from './components/Toast'
+export * from './components/MultiSelectCombobox'
 
 export * from './utils/csv'
 export * from './utils/date'
