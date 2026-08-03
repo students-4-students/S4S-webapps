@@ -295,8 +295,6 @@ function Staffs() {
   return (
     <div className="staffs-page">
       <PageHeader
-        title="Gestion des Staffs"
-        subtitle="Consultez et gérez les membres du staff et leurs rôles"
         actions={
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <Button variant="primary" onClick={() => setShowAddModal(true)}>

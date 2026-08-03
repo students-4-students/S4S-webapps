@@ -477,16 +477,6 @@ export default function Workshops() {
 
   return (
     <div className="workshops-page">
-      {/* Top Header */}
-      <div className="workshops-header">
-        <div>
-          <h1>Gestion des Workshops</h1>
-        </div>
-        <button className="btn-create-workshop" onClick={openCreateModal}>
-          <span>+ Créer un workshop</span>
-        </button>
-      </div>
-
       {/* Search & Filter Toolbar */}
       <div className="workshops-toolbar">
         <div className="search-box">
@@ -538,6 +528,9 @@ export default function Workshops() {
             </button>
           )}
         </div>
+        <button className="btn-primary" onClick={openCreateModal}>
+          <span>+ Créer un workshop</span>
+        </button>
       </div>
 
       {/* Scrollable Container for Workshops */}

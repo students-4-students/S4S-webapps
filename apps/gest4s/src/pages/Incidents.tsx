@@ -46,8 +46,6 @@ function Incidents() {
     <div className="dashboard" style={{ position: 'relative' }}>
       <div className="col" style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem', overflow: 'hidden' }}>
         <PageHeader
-          title="Incidents"
-          subtitle="Suivez et résolvez les problèmes signalés pendant la semaine"
           actions={
             <Button variant="primary" onClick={() => setShowModal(true)}>
               + Nouveau

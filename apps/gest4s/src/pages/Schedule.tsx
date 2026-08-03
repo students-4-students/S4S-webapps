@@ -304,7 +304,6 @@ function Schedule() {
       {/* Top Header Grid Row */}
       <div className="schedule-header-row">
         <div className="schedule-title-area">
-          <h1>Planning</h1>
           <span className="print-subtitle" style={{ display: 'none', color: '#1e293b', fontSize: '1.1rem', fontWeight: 600, marginLeft: '1rem' }}>
             {viewType === 'section' && `Section: ${activeEntityId}`}
             {viewType === 'location' && `Salle: ${activeEntityId}`}

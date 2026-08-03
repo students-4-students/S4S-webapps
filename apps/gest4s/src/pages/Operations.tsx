@@ -323,8 +323,6 @@ export default function Operations() {
     <div className="operations-page" style={{ padding: '1.5rem', width: '100%', height: '100%', overflowY: 'auto', boxSizing: 'border-box' }}>
       {/* Header */}
       <PageHeader
-        title="Opérations & Pôles"
-        subtitle="Organisation et suivi des tâches par pôle opérationnel"
         actions={
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <div style={{ display: 'flex', background: 'var(--s4s-bg-subtle)', padding: '0.25rem', borderRadius: 'var(--s4s-radius-md)', border: '1px solid var(--s4s-border)' }}>
