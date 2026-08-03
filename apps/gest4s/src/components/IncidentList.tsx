@@ -1,17 +1,18 @@
 import { trpc } from '../trpc'
 import IncidentCard from './IncidentCard'
+import { useIncidentRealtimeUpdates } from '../hooks/useIncidentRealtimeUpdates'
 
 interface Props {
   onNew: () => void
 }
 
 function IncidentList({ onNew }: Props) {
-  const utils = trpc.useUtils()
-  const { data: incidents = [], isLoading } = trpc.incidents.list.useQuery()
-
-  trpc.incidents.onCreated.useSubscription(undefined, {
-    onData: () => utils.incidents.list.invalidate(),
+  const { data: incidents = [], isLoading } = trpc.incidents.list.useQuery(undefined, {
+    refetchInterval: 1000,
+    refetchOnWindowFocus: "always",
   })
+
+  useIncidentRealtimeUpdates()
 
   return (
     <div className='col' style={{ width: '25%' }}>

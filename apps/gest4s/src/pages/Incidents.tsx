@@ -4,6 +4,7 @@ import { trpc } from '../trpc'
 import IncidentCard from '../components/IncidentCard'
 import CreateIncidentModal from '../components/CreateIncidentModal'
 import { PageHeader, Select, Button, EmptyState, LoadingSpinner } from '@s4s/ui'
+import { useIncidentRealtimeUpdates } from '../hooks/useIncidentRealtimeUpdates'
 import '../../styles/dashboard.css'
 
 const STATUS_OPTIONS = [
@@ -23,15 +24,15 @@ const SEVERITY_OPTIONS = [
 const CATEGORIES = ['Matériel', 'Problèmes techniques', 'Logistique', 'Catering', 'RH', 'Exercices', 'Cours']
 
 function Incidents() {
-  const utils = trpc.useUtils()
   const [showModal, setShowModal] = useState(false)
   const [filters, setFilters] = useState({ status: '', severity: '', category: '' })
 
-  const { data: incidents = [], isLoading } = trpc.incidents.list.useQuery()
-
-  trpc.incidents.onCreated.useSubscription(undefined, {
-    onData: () => utils.incidents.list.invalidate(),
+  const { data: incidents = [], isLoading } = trpc.incidents.list.useQuery(undefined, {
+    refetchInterval: 1000,
+    refetchOnWindowFocus: "always",
   })
+
+  useIncidentRealtimeUpdates()
 
   const filtered = incidents.filter(
     (inc) =>

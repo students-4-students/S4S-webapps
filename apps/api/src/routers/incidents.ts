@@ -56,7 +56,7 @@ export const incidentsRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const { id, ...data } = input
-      return ctx.db.incident.update({
+      const incident = await ctx.db.incident.update({
         where: { id },
         data,
         include: {
@@ -64,10 +64,38 @@ export const incidentsRouter = router({
           assignedTo: { select: { id: true, firstName: true, lastName: true } },
         },
       })
+      incidentEmitter.emit('updated', incident)
+      return incident
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const incident = await ctx.db.incident.delete({
+        where: { id: input.id },
+        include: {
+          reportedBy: { select: { firstName: true, lastName: true, telegramUsername: true } },
+          assignedTo: { select: { id: true, firstName: true, lastName: true } },
+        },
+      })
+      incidentEmitter.emit('deleted', incident)
+      return incident
     }),
 
   onCreated: protectedProcedure.subscription(async function* ({ signal }) {
     for await (const [incident] of on(incidentEmitter, 'created', { signal })) {
+      yield incident as { id: string }
+    }
+  }),
+
+  onUpdated: protectedProcedure.subscription(async function* ({ signal }) {
+    for await (const [incident] of on(incidentEmitter, 'updated', { signal })) {
+      yield incident as { id: string }
+    }
+  }),
+
+  onDeleted: protectedProcedure.subscription(async function* ({ signal }) {
+    for await (const [incident] of on(incidentEmitter, 'deleted', { signal })) {
       yield incident as { id: string }
     }
   }),
