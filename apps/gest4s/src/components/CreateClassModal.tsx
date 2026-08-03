@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { trpc } from '../trpc'
+import { Modal, Input, Select, Button } from '@s4s/ui'
 
 const DAYS = [
   { dateStr: '2026-08-26', label: 'Mer 26 août', fullLabel: 'Mercredi 26 août' },
@@ -32,14 +33,12 @@ interface Props {
 function CreateClassModal({ defaultSection, onClose }: Props) {
   const utils = trpc.useUtils()
 
-  // Form States
   const [title, setTitle] = useState('')
   const [type, setType] = useState<'LECTURE' | 'EXERCISE' | 'SPECIAL' | 'MEAL'>('LECTURE')
   const [selectedSections, setSelectedSections] = useState<string[]>([
     defaultSection && SECTIONS.includes(defaultSection.toUpperCase()) ? defaultSection.toUpperCase() : 'CMS'
   ])
 
-  // Multiple Sessions State (now includes location per session)
   const [sessions, setSessions] = useState<Session[]>([
     { id: '1', day: '2026-08-26', startTime: '08:00', endTime: '10:00', location: '' }
   ])
@@ -114,35 +113,30 @@ function CreateClassModal({ defaultSection, onClose }: Props) {
   }
 
   return (
-    <div className='modal-overlay' onClick={onClose}>
-      <div className='modal' style={{ width: '480px', maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
-        <h2>Créer un cours</h2>
-        <form onSubmit={handleSubmit}>
-          <label>
-            Titre *
-            <input
-              required
-              placeholder="Ex: Analyse I, Physique générale"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </label>
+    <Modal isOpen onClose={onClose} title="Créer un cours" size="md">
+      <form onSubmit={handleSubmit}>
+        <Input
+          label="Titre"
+          required
+          placeholder="Ex: Analyse I, Physique générale"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
 
-          <label>
-            Type de cours *
-            <select value={type} onChange={(e) => setType(e.target.value as any)}>
-              <option value='LECTURE'>Cours (Lecture)</option>
-              <option value='EXERCISE'>Exercices (Exercise)</option>
-              <option value='SPECIAL'>Spécial (Special)</option>
-              <option value='MEAL'>Repas (Meal)</option>
-            </select>
-          </label>
+        <Select
+          label="Type de cours"
+          value={type}
+          onChange={(e) => setType(e.target.value as any)}
+        >
+          <option value="LECTURE">Cours (Lecture)</option>
+          <option value="EXERCISE">Exercices (Exercise)</option>
+          <option value="SPECIAL">Spécial (Special)</option>
+          <option value="MEAL">Repas (Meal)</option>
+        </Select>
 
-          {/* Section Selector Grid */}
-          <label style={{ marginTop: '0.25rem' }}>
-            Sections * (Sélectionnez au moins une)
-          </label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem', marginTop: '0.25rem' }}>
+        <div style={{ marginBottom: '1rem' }}>
+          <label className="s4s-label">Sections * (Sélectionnez au moins une)</label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem', marginTop: '0.375rem' }}>
             {SECTIONS.map((sec) => {
               const isSelected = selectedSections.includes(sec)
               return (
@@ -154,14 +148,13 @@ function CreateClassModal({ defaultSection, onClose }: Props) {
                     padding: '0.4rem',
                     fontSize: '0.8rem',
                     fontWeight: 600,
-                    borderRadius: '6px',
+                    borderRadius: 'var(--s4s-radius-sm)',
                     border: '1px solid',
-                    borderColor: isSelected ? 'var(--secondary-purple)' : '#ddd',
-                    background: isSelected ? 'var(--primary-purple)' : 'transparent',
-                    color: isSelected ? 'white' : 'var(--primary-purple)',
+                    borderColor: isSelected ? 'var(--s4s-primary)' : 'var(--s4s-border)',
+                    background: isSelected ? 'var(--s4s-primary)' : 'transparent',
+                    color: isSelected ? 'white' : 'var(--s4s-text-primary)',
                     cursor: 'pointer',
-                    marginTop: 0,
-                    transition: 'all 0.2s ease',
+                    transition: 'all var(--s4s-transition-fast)',
                     textAlign: 'center'
                   }}
                 >
@@ -170,10 +163,11 @@ function CreateClassModal({ defaultSection, onClose }: Props) {
               )
             })}
           </div>
+        </div>
 
-          {/* Sessions List */}
-          <label style={{ marginTop: '0.8rem' }}>Sessions *</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}>
+        <div style={{ marginBottom: '1rem' }}>
+          <label className="s4s-label">Sessions *</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.375rem' }}>
             {sessions.map((sess) => (
               <div
                 key={sess.id}
@@ -182,12 +176,13 @@ function CreateClassModal({ defaultSection, onClose }: Props) {
                   gap: '0.4rem',
                   alignItems: 'center',
                   padding: '0.5rem',
-                  background: '#f8f9fa',
-                  borderRadius: '8px',
-                  border: '1px solid #eee'
+                  background: 'var(--s4s-bg-subtle)',
+                  borderRadius: 'var(--s4s-radius-md)',
+                  border: '1px solid var(--s4s-border)'
                 }}
               >
                 <select
+                  className="s4s-select"
                   style={{ flex: 1.5, padding: '0.3rem' }}
                   value={sess.day}
                   onChange={(e) => updateSession(sess.id, 'day', e.target.value)}
@@ -202,16 +197,18 @@ function CreateClassModal({ defaultSection, onClose }: Props) {
                 <input
                   type="time"
                   required
+                  className="s4s-input"
                   style={{ flex: 1, padding: '0.3rem', minWidth: '65px' }}
                   value={sess.startTime}
                   onChange={(e) => updateSession(sess.id, 'startTime', e.target.value)}
                 />
 
-                <span style={{ fontSize: '0.8rem', color: '#666' }}>à</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--s4s-text-muted)' }}>à</span>
 
                 <input
                   type="time"
                   required
+                  className="s4s-input"
                   style={{ flex: 1, padding: '0.3rem', minWidth: '65px' }}
                   value={sess.endTime}
                   onChange={(e) => updateSession(sess.id, 'endTime', e.target.value)}
@@ -220,59 +217,52 @@ function CreateClassModal({ defaultSection, onClose }: Props) {
                 <input
                   type="text"
                   placeholder="Salle (ex: CO2)"
+                  className="s4s-input"
                   style={{ flex: 1.2, padding: '0.3rem', minWidth: '80px' }}
                   value={sess.location}
                   onChange={(e) => updateSession(sess.id, 'location', e.target.value)}
                 />
 
                 {sessions.length > 1 && (
-                  <button
+                  <Button
                     type="button"
+                    variant="danger"
+                    size="sm"
                     onClick={() => removeSession(sess.id)}
-                    style={{
-                      padding: '0.3rem 0.5rem',
-                      background: '#e74c3c',
-                      color: 'white',
-                      borderRadius: '4px',
-                      marginTop: 0,
-                      fontSize: '0.8rem'
-                    }}
+                    style={{ padding: '0.3rem 0.5rem', minWidth: 'auto', height: 'auto' }}
                   >
                     🗑️
-                  </button>
+                  </Button>
                 )}
               </div>
             ))}
 
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={addSession}
-              style={{
-                padding: '0.4rem',
-                background: 'transparent',
-                border: '1px dashed var(--primary-purple)',
-                color: 'var(--primary-purple)',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontWeight: 600,
-                marginTop: '0.2rem',
-                transition: 'all 0.2s ease',
-              }}
+              style={{ marginTop: '0.2rem' }}
             >
               + Ajouter une session
-            </button>
+            </Button>
           </div>
+        </div>
 
-          <div className='modal-actions' style={{ marginTop: '1.5rem' }}>
-            <button type='button' onClick={onClose}>Annuler</button>
-            <button type='submit' className='btn-primary' disabled={createMutation.isPending}>
-              {createMutation.isPending ? 'Création…' : 'Créer'}
-            </button>
-          </div>
-          {createMutation.isError && <p className='error'>{createMutation.error.message}</p>}
-        </form>
-      </div>
-    </div>
+        {createMutation.isError && (
+          <p style={{ color: 'var(--s4s-danger)', fontSize: '0.85rem' }}>{createMutation.error.message}</p>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Annuler
+          </Button>
+          <Button type="submit" variant="primary" isLoading={createMutation.isPending}>
+            Créer
+          </Button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 

@@ -31,39 +31,7 @@ interface Workshop {
   dates: WorkshopSession[]
 }
 
-// Format date-time range in French Switzerland locale
-const formatDateTimeRange = (startTimeVal: string | Date, endTimeVal: string | Date) => {
-  const start = new Date(startTimeVal)
-  const end = new Date(endTimeVal)
-  const locale = 'fr-CH'
-
-  const isSameDay = start.toDateString() === end.toDateString()
-
-  const startStr = start.toLocaleString(locale, {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-
-  if (isSameDay) {
-    const endStr = end.toLocaleTimeString(locale, {
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-    return `${startStr} - ${endStr}`
-  } else {
-    const endStr = end.toLocaleString(locale, {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-    return `${startStr} - ${endStr}`
-  }
-}
+import { formatDateTimeRange } from '@s4s/ui'
 
 export default function Workshops() {
   const [searchQuery, setSearchQuery] = useState('')

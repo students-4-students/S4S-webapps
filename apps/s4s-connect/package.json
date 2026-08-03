@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@s4s/types": "workspace:*",
+    "@s4s/ui": "workspace:*",
     "@tanstack/react-query": "^5.101.0",
     "@tanstack/react-router": "^1.170.18",
     "@tanstack/router-plugin": "^1.168.20",

@@ -6,6 +6,10 @@
     "module": "esnext",
     "types": ["vite/client"],
     "skipLibCheck": true,
+    "paths": {
+      "@s4s/types": ["../../packages/types/src/index.ts"],
+      "@s4s/ui": ["../../packages/ui/src/index.ts"]
+    },
 
     /* Bundler mode */
     "moduleResolution": "bundler",

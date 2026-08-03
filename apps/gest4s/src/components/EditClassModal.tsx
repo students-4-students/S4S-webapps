@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { trpc } from '../trpc'
+import { Modal, Input, Select, Button } from '@s4s/ui'
 
 const DAYS = [
   { dateStr: '2026-08-26', label: 'Mer 26 août', fullLabel: 'Mercredi 26 août' },
@@ -24,7 +25,6 @@ interface Props {
 function EditClassModal({ slot, onClose }: Props) {
   const utils = trpc.useUtils()
 
-  // Format existing Dates
   const startObj = new Date(slot.startTime)
   const endObj = new Date(slot.endTime)
 
@@ -41,7 +41,6 @@ function EditClassModal({ slot, onClose }: Props) {
     return `${hours}:${minutes}`
   }
 
-  // Form States
   const [title, setTitle] = useState(slot.title)
   const [type, setType] = useState<'LECTURE' | 'EXERCISE' | 'SPECIAL' | 'MEAL'>(
     slot.type === 'EXERCISE' ? 'EXERCISE' : (slot.type === 'SPECIAL' ? 'SPECIAL' : (slot.type === 'MEAL' ? 'MEAL' : 'LECTURE'))
@@ -90,113 +89,108 @@ function EditClassModal({ slot, onClose }: Props) {
   }
 
   return (
-    <div className='modal-overlay' onClick={onClose}>
-      <div className='modal' style={{ width: '420px', maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
-        <h2>Modifier le cours</h2>
-        <form onSubmit={handleSubmit}>
-          <label>
-            Titre *
-            <input
-              required
-              placeholder="Ex: Analyse I, Physique générale"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </label>
+    <Modal isOpen onClose={onClose} title="Modifier le cours" size="md">
+      <form onSubmit={handleSubmit}>
+        <Input
+          label="Titre"
+          required
+          placeholder="Ex: Analyse I, Physique générale"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
 
-          <label>
-            Type de cours *
-            <select value={type} onChange={(e) => setType(e.target.value as any)}>
-              <option value='LECTURE'>Cours (Lecture)</option>
-              <option value='EXERCISE'>Exercices (Exercise)</option>
-              <option value='SPECIAL'>Spécial (Special)</option>
-              <option value='MEAL'>Repas (Meal)</option>
-            </select>
-          </label>
+        <Select
+          label="Type de cours"
+          value={type}
+          onChange={(e) => setType(e.target.value as any)}
+        >
+          <option value="LECTURE">Cours (Lecture)</option>
+          <option value="EXERCISE">Exercices (Exercise)</option>
+          <option value="SPECIAL">Spécial (Special)</option>
+          <option value="MEAL">Repas (Meal)</option>
+        </Select>
 
-          <label>
-            Salle / Lieu
-            <input
-              placeholder="Ex: CO2, INM202"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-            />
-          </label>
+        <Input
+          label="Salle / Lieu"
+          placeholder="Ex: CO2, INM202"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+        />
 
-          <label>
-            Section *
-            <select value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
-              {SECTIONS.map((sec) => (
-                <option key={sec} value={sec}>
-                  {sec}
+        <Select
+          label="Section"
+          value={sectionId}
+          onChange={(e) => setSectionId(e.target.value)}
+        >
+          {SECTIONS.map((sec) => (
+            <option key={sec} value={sec}>
+              {sec}
+            </option>
+          ))}
+        </Select>
+
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          <div style={{ flex: 2 }}>
+            <Select label="Jour" value={day} onChange={(e) => setDay(e.target.value)}>
+              {DAYS.map((d) => (
+                <option key={d.dateStr} value={d.dateStr}>
+                  {d.label}
                 </option>
               ))}
-            </select>
-          </label>
-
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <label style={{ flex: 2 }}>
-              Jour *
-              <select value={day} onChange={(e) => setDay(e.target.value)}>
-                {DAYS.map((d) => (
-                  <option key={d.dateStr} value={d.dateStr}>
-                    {d.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label style={{ flex: 1 }}>
-              Début *
-              <input
-                type="time"
-                required
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-              />
-            </label>
-            <label style={{ flex: 1 }}>
-              Fin *
-              <input
-                type="time"
-                required
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-              />
-            </label>
+            </Select>
           </div>
+          <div style={{ flex: 1 }}>
+            <Input
+              label="Début"
+              type="time"
+              required
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <Input
+              label="Fin"
+              type="time"
+              required
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+            />
+          </div>
+        </div>
 
-          <div className='modal-actions' style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-            <button
-              type='button'
-              onClick={handleDelete}
-              style={{
-                background: '#e74c3c',
-                color: 'white',
-                marginTop: 0,
-              }}
-              disabled={deleteMutation.isPending || updateMutation.isPending}
+        {updateMutation.isError && (
+          <p style={{ color: 'var(--s4s-danger)', fontSize: '0.85rem' }}>{updateMutation.error.message}</p>
+        )}
+        {deleteMutation.isError && (
+          <p style={{ color: 'var(--s4s-danger)', fontSize: '0.85rem' }}>{deleteMutation.error.message}</p>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem' }}>
+          <Button
+            type="button"
+            variant="danger"
+            onClick={handleDelete}
+            isLoading={deleteMutation.isPending}
+          >
+            Supprimer
+          </Button>
+
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Annuler
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              isLoading={updateMutation.isPending}
             >
-              {deleteMutation.isPending ? 'Suppression…' : 'Supprimer'}
-            </button>
-            
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button type='button' onClick={onClose} style={{ marginTop: 0 }}>Annuler</button>
-              <button
-                type='submit'
-                className='btn-primary'
-                style={{ marginTop: 0 }}
-                disabled={deleteMutation.isPending || updateMutation.isPending}
-              >
-                {updateMutation.isPending ? 'Enregistrement…' : 'Enregistrer'}
-              </button>
-            </div>
+              Enregistrer
+            </Button>
           </div>
-          
-          {updateMutation.isError && <p className='error'>{updateMutation.error.message}</p>}
-          {deleteMutation.isError && <p className='error'>{deleteMutation.error.message}</p>}
-        </form>
-      </div>
-    </div>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
