@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useParams } from '@tanstack/react-router'
+import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { trpc } from '../trpc'
 import '../../styles/dashboard.css'
 
@@ -13,12 +13,21 @@ const CATEGORIES = ['Matériel', 'Problèmes techniques', 'Logistique', 'Caterin
 
 function IncidentDetail() {
   const { incidentId } = useParams({ from: '/incidents/$incidentId' })
+  const navigate = useNavigate()
   const utils = trpc.useUtils()
 
   const { data: incident, isLoading } = trpc.incidents.getById.useQuery({ id: incidentId })
 
   const update = trpc.incidents.update.useMutation({
     onSuccess: () => utils.incidents.getById.invalidate({ id: incidentId }),
+  })
+
+  const deleteMutation = trpc.incidents.delete.useMutation({
+    onSuccess: async () => {
+      navigate({ to: '/incidents' })
+      await utils.incidents.list.invalidate()
+      await utils.incidents.getById.invalidate({ id: incidentId })
+    },
   })
 
   const [form, setForm] = useState({
@@ -54,6 +63,14 @@ function IncidentDetail() {
       severity: form.severity,
       status: form.status,
     })
+  }
+
+  function handleDelete() {
+    if (!window.confirm(`Supprimer l'incident « ${incident?.title ?? 'ce ticket'} » ?`)) {
+      return
+    }
+
+    deleteMutation.mutate({ id: incidentId })
   }
 
   if (isLoading) return <div className='dashboard'><p>Chargement…</p></div>
@@ -151,9 +168,12 @@ function IncidentDetail() {
             </label>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <button type='submit' className='btn-primary' disabled={update.isPending}>
               {update.isPending ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
+            <button type='button' className='btn-secondary' onClick={handleDelete} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? 'Suppression…' : 'Supprimer'}
             </button>
             {update.isSuccess && <span style={{ fontSize: '0.85rem', color: '#27ae60' }}>Modifications enregistrées</span>}
             {update.isError && <span style={{ fontSize: '0.85rem', color: '#c0392b' }}>{update.error.message}</span>}

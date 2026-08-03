@@ -14,6 +14,8 @@ function IncidentList({ onNew }: Props) {
 
   useIncidentRealtimeUpdates()
 
+  const visibleIncidents = incidents.filter((incident) => incident.status === 'OPEN' || incident.status === 'IN_PROGRESS')
+
   return (
     <div className='col' style={{ width: '25%' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -22,8 +24,8 @@ function IncidentList({ onNew }: Props) {
       </div>
 
       {isLoading && <p>Chargement…</p>}
-      {incidents.map((incident) => (
-        <IncidentCard key={incident.id} incident={incident} />
+      {visibleIncidents.map((incident) => (
+        <IncidentCard key={incident.id} incident={incident} showDelete={false} />
       ))}
     </div>
   )

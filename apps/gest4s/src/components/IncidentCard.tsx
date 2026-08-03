@@ -1,5 +1,6 @@
+import { useState, type MouseEvent } from 'react'
 import { Link } from '@tanstack/react-router'
-import type { RouterOutputs } from '../trpc'
+import { trpc, type RouterOutputs } from '../trpc'
 import { Card, Badge } from '@s4s/ui'
 
 type Incident = RouterOutputs['incidents']['list'][number]
@@ -28,7 +29,31 @@ const STATUS_LABELS: Record<string, string> = {
   RESOLVED: 'Résolu',
 }
 
-function IncidentCard({ incident }: { incident: Incident }) {
+function IncidentCard({ incident, showDelete=true }: { incident: Incident; showDelete: boolean }) {
+  const utils = trpc.useUtils()
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const deleteMutation = trpc.incidents.delete.useMutation({
+    onSuccess: async () => {
+      await utils.incidents.list.invalidate()
+      await utils.incidents.getById.invalidate({ id: incident.id })
+      setIsDeleting(false)
+    },
+    onError: () => setIsDeleting(false),
+  })
+
+  function handleDelete(e: MouseEvent<HTMLButtonElement>) {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (!window.confirm(`Supprimer l'incident « ${incident.title} » ?`)) {
+      return
+    }
+
+    setIsDeleting(true)
+    deleteMutation.mutate({ id: incident.id })
+  }
+
   return (
     <Link
       to="/incidents/$incidentId"
@@ -48,9 +73,29 @@ function IncidentCard({ incident }: { incident: Incident }) {
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
           <strong style={{ fontSize: '0.95rem', color: 'var(--s4s-text-primary)' }}>{incident.title}</strong>
-          <Badge variant={STATUS_VARIANTS[incident.status] || 'neutral'} showDot>
-            {STATUS_LABELS[incident.status]}
-          </Badge>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Badge variant={STATUS_VARIANTS[incident.status] || 'neutral'} showDot>
+              {STATUS_LABELS[incident.status]}
+            </Badge>
+            {showDelete && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleteMutation.isPending || isDeleting}
+                title="Supprimer"
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--s4s-danger)',
+                  cursor: deleteMutation.isPending || isDeleting ? 'wait' : 'pointer',
+                  fontSize: '0.85rem',
+                  padding: 0,
+                }}
+              >
+              {deleteMutation.isPending || isDeleting ? '…' : '✕'}
+            </button>
+            )}
+          </div>
         </div>
 
         <p
