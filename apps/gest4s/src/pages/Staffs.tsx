@@ -424,10 +424,6 @@ function Staffs() {
         </div>
       </div>
 
-      <Link to="/" className="back-link" style={{ marginTop: '1.5rem', display: 'inline-block' }}>
-        ← Dashboard
-      </Link>
-
       {/* Add Staff Modal */}
       <Modal
         isOpen={showAddModal}

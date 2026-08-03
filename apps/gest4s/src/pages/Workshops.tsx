@@ -663,12 +663,6 @@ export default function Workshops() {
         )}
       </div>
 
-      {/* Link back to Dashboard */}
-      <div className="workshops-footer">
-        <Link to="/" className="btn-back-dashboard">
-          ← Retour au Dashboard
-        </Link>
-      </div>
 
       {/* Create / Edit Modal */}
       {showModal && (

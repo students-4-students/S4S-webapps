@@ -740,10 +740,6 @@ export default function Operations() {
         </div>
       )}
 
-      <Link to="/" style={{ marginTop: '1.5rem', display: 'inline-block', color: 'var(--s4s-primary)', fontWeight: 600, textDecoration: 'none' }}>
-        ← Dashboard
-      </Link>
-
       {/* Task Creation & Edit Modal */}
       <Modal
         isOpen={showTaskModal}

@@ -268,10 +268,6 @@ export default function Students() {
         )}
       </div>
 
-      <Link to="/" className="back-link" style={{ marginTop: '1.5rem', display: 'inline-block' }}>
-        ← Retour au Tableau de bord
-      </Link>
-
       {/* Add Student Modal */}
       <Modal
         isOpen={showAddModal}
