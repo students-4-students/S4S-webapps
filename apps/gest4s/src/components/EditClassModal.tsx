@@ -21,9 +21,10 @@ const SECTIONS = [
 interface Props {
   slot: any
   onClose: () => void
+  onDuplicate?: (slot: any) => void
 }
 
-function EditClassModal({ slot, onClose }: Props) {
+function EditClassModal({ slot, onClose, onDuplicate }: Props) {
   const utils = trpc.useUtils()
 
   const startObj = new Date(slot.startTime)
@@ -54,6 +55,20 @@ function EditClassModal({ slot, onClose }: Props) {
   const [speakerId, setSpeakerId] = useState<string>(slot.speakerId || slot.speaker?.id || '')
   const [assistantId, setAssistantId] = useState<string>(slot.assistantId || slot.assistant?.id || '')
   const [rcId, setRcId] = useState<string>(slot.rcId || slot.rc?.id || '')
+
+  const conflictQuery = trpc.schedules.checkConflicts.useQuery(
+    {
+      id: slot.id,
+      startTime: new Date(`${day}T${startTime}:00`),
+      endTime: new Date(`${day}T${endTime}:00`),
+      location: location || undefined,
+      sectionId: sectionId || undefined,
+    },
+    {
+      enabled: Boolean(day && startTime && endTime),
+    }
+  )
+  const conflicts = conflictQuery.data || []
 
   const { data: staffs = [] } = trpc.staffs.list.useQuery()
 
@@ -100,6 +115,29 @@ function EditClassModal({ slot, onClose }: Props) {
   return (
     <Modal isOpen onClose={onClose} title="Modifier le cours" size="lg">
       <form onSubmit={handleSubmit}>
+        {conflicts.length > 0 && (
+          <div
+            style={{
+              marginBottom: '1.25rem',
+              padding: '0.75rem 1rem',
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid var(--s4s-danger)',
+              borderRadius: 'var(--s4s-radius-md)',
+              color: '#f87171',
+              fontSize: '0.85rem',
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span>⚠️ Conflit(s) de réservation ({conflicts.length})</span>
+            </div>
+            <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+              {conflicts.map((c: any, idx: number) => (
+                <li key={idx}>{c.message}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <Input
           label="Titre"
           required
@@ -202,14 +240,37 @@ function EditClassModal({ slot, onClose }: Props) {
         )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem' }}>
-          <Button
-            type="button"
-            variant="danger"
-            onClick={handleDelete}
-            isLoading={deleteMutation.isPending}
-          >
-            Supprimer
-          </Button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={handleDelete}
+              isLoading={deleteMutation.isPending}
+            >
+              Supprimer
+            </Button>
+            {onDuplicate && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  onDuplicate({
+                    title,
+                    type,
+                    section: { name: sectionId },
+                    startTime: `${day}T${startTime}:00`,
+                    endTime: `${day}T${endTime}:00`,
+                    location,
+                    speakerId,
+                    assistantId,
+                    rcId,
+                  })
+                }}
+              >
+                📋 Dupliquer
+              </Button>
+            )}
+          </div>
 
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             <Button type="button" variant="secondary" onClick={onClose}>

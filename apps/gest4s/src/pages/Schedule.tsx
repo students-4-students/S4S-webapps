@@ -53,6 +53,7 @@ function Schedule() {
   const [showCreateShiftModal, setShowCreateShiftModal] = useState<boolean>(false)
   const [selectedSlotForEdit, setSelectedSlotForEdit] = useState<any | null>(null)
   const [selectedShiftForEdit, setSelectedShiftForEdit] = useState<any | null>(null)
+  const [duplicateInitialData, setDuplicateInitialData] = useState<any | null>(null)
 
   const { data: slots, isLoading: loadingSlots, error: errorSlots } = trpc.schedules.list.useQuery()
   const { data: staffs, isLoading: loadingStaffs } = trpc.staffs.list.useQuery()
@@ -478,7 +479,11 @@ function Schedule() {
       {showCreateModal && (
         <CreateClassModal
           defaultSection={activeEntityId}
-          onClose={() => setShowCreateModal(false)}
+          initialData={duplicateInitialData}
+          onClose={() => {
+            setShowCreateModal(false)
+            setDuplicateInitialData(null)
+          }}
         />
       )}
       {showCreateShiftModal && (
@@ -491,6 +496,11 @@ function Schedule() {
         <EditClassModal
           slot={selectedSlotForEdit}
           onClose={() => setSelectedSlotForEdit(null)}
+          onDuplicate={(slotToDuplicate) => {
+            setSelectedSlotForEdit(null)
+            setDuplicateInitialData(slotToDuplicate)
+            setShowCreateModal(true)
+          }}
         />
       )}
       {selectedShiftForEdit && (

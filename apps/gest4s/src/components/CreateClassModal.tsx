@@ -28,25 +28,70 @@ interface Session {
 
 interface Props {
   defaultSection: string
+  initialData?: any
   onClose: () => void
 }
 
-function CreateClassModal({ defaultSection, onClose }: Props) {
+function CreateClassModal({ defaultSection, initialData, onClose }: Props) {
   const utils = trpc.useUtils()
 
-  const [title, setTitle] = useState('')
-  const [type, setType] = useState<'LECTURE' | 'EXERCISE' | 'SPECIAL' | 'MEAL'>('LECTURE')
+  const [title, setTitle] = useState(initialData?.title || '')
+  const [type, setType] = useState<'LECTURE' | 'EXERCISE' | 'SPECIAL' | 'MEAL'>(
+    initialData?.type || 'LECTURE'
+  )
   const [selectedSections, setSelectedSections] = useState<string[]>([
-    defaultSection && SECTIONS.includes(defaultSection.toUpperCase()) ? defaultSection.toUpperCase() : 'CMS'
+    initialData?.section?.name
+      ? initialData.section.name.toUpperCase()
+      : defaultSection && SECTIONS.includes(defaultSection.toUpperCase())
+        ? defaultSection.toUpperCase()
+        : 'CMS',
   ])
 
-  const [sessions, setSessions] = useState<Session[]>([
-    { id: '1', day: '2026-08-26', startTime: '08:00', endTime: '10:00', location: '' }
-  ])
+  const formatHHMM = (dStr: string | Date) => {
+    const d = new Date(dStr)
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  }
 
-  const [speakerId, setSpeakerId] = useState<string>('')
-  const [assistantId, setAssistantId] = useState<string>('')
-  const [rcId, setRcId] = useState<string>('')
+  const formatYYYYMMDD = (dStr: string | Date) => {
+    const d = new Date(dStr)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
+  const [sessions, setSessions] = useState<Session[]>(
+    initialData
+      ? [
+          {
+            id: '1',
+            day: formatYYYYMMDD(initialData.startTime),
+            startTime: formatHHMM(initialData.startTime),
+            endTime: formatHHMM(initialData.endTime),
+            location: initialData.location || '',
+          },
+        ]
+      : [{ id: '1', day: '2026-08-26', startTime: '08:00', endTime: '10:00', location: '' }]
+  )
+
+  const [speakerId, setSpeakerId] = useState<string>(
+    initialData?.speakerId || initialData?.speaker?.id || ''
+  )
+  const [assistantId, setAssistantId] = useState<string>(
+    initialData?.assistantId || initialData?.assistant?.id || ''
+  )
+  const [rcId, setRcId] = useState<string>(initialData?.rcId || initialData?.rc?.id || '')
+
+  const firstSession = sessions[0]
+  const conflictQuery = trpc.schedules.checkConflicts.useQuery(
+    {
+      startTime: new Date(`${firstSession?.day}T${firstSession?.startTime}:00`),
+      endTime: new Date(`${firstSession?.day}T${firstSession?.endTime}:00`),
+      location: firstSession?.location || undefined,
+      sectionId: selectedSections[0] || undefined,
+    },
+    {
+      enabled: Boolean(firstSession?.day && firstSession?.startTime && firstSession?.endTime),
+    }
+  )
+  const conflicts = conflictQuery.data || []
 
   const { data: staffs = [] } = trpc.staffs.list.useQuery()
   const createMutation = trpc.schedules.create.useMutation()
@@ -124,6 +169,29 @@ function CreateClassModal({ defaultSection, onClose }: Props) {
   return (
     <Modal isOpen onClose={onClose} title="Créer un cours" size="lg">
       <form onSubmit={handleSubmit}>
+        {conflicts.length > 0 && (
+          <div
+            style={{
+              marginBottom: '1.25rem',
+              padding: '0.75rem 1rem',
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid var(--s4s-danger)',
+              borderRadius: 'var(--s4s-radius-md)',
+              color: '#f87171',
+              fontSize: '0.85rem',
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span>⚠️ Conflit(s) de réservation ({conflicts.length})</span>
+            </div>
+            <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+              {conflicts.map((c: any, idx: number) => (
+                <li key={idx}>{c.message}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <Input
           label="Titre"
           required
