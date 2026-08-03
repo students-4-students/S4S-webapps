@@ -70,6 +70,7 @@ function Schedule() {
         task.assignments.forEach((assignment: any) => {
           mapped.push({
             id: `task-${task.id}-${assignment.staffMemberId}`,
+            taskId: task.id,
             title: `[${task.category}] ${task.name}`,
             description: task.description || `Tâche Opérationnelle - Pôle ${task.category}`,
             startTime: task.startTime,
@@ -255,33 +256,47 @@ function Schedule() {
   // Filter slots for a given day and selected entity
   const getSlotsForDay = (dateStr: string) => {
     const combinedSlots = [...safeSlots, ...mappedTaskSlots, ...mappedShiftSlots]
-    return combinedSlots
-      .filter((slot) => {
-        if (getSlotDateStr(slot.startTime) !== dateStr) return false
+    const filtered = combinedSlots.filter((slot) => {
+      if (getSlotDateStr(slot.startTime) !== dateStr) return false
 
-        if (viewType === 'section') {
-          return slot.section?.name?.toUpperCase() === activeEntityId.toUpperCase()
-        } else if (viewType === 'location') {
-          if (activeEntityId === 'none') {
-            return !slot.location
-          }
-          if (!slot.location) return false
-          const rooms = slot.location.split(/[,;/]+/).map((r: string) => r.trim().toUpperCase()).filter((r: string) => r.length > 0)
-          return rooms.includes(activeEntityId.toUpperCase())
-        } else if (viewType === 'person') {
-          if (activeEntityId === 'none') {
-            return !slot.speakerId && !slot.assistantId && !slot.rcId && !slot.assignedStaffId
-          }
-          return (
-            slot.speakerId === activeEntityId ||
-            slot.assistantId === activeEntityId ||
-            slot.rcId === activeEntityId ||
-            slot.assignedStaffId === activeEntityId
-          )
+      if (viewType === 'section') {
+        return slot.section?.name?.toUpperCase() === activeEntityId.toUpperCase()
+      } else if (viewType === 'location') {
+        if (activeEntityId === 'none') {
+          return !slot.location
         }
-        return false
-      })
-      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+        if (!slot.location) return false
+        const rooms = slot.location.split(/[,;/]+/).map((r: string) => r.trim().toUpperCase()).filter((r: string) => r.length > 0)
+        return rooms.includes(activeEntityId.toUpperCase())
+      } else if (viewType === 'person') {
+        if (activeEntityId === 'none') {
+          return !slot.speakerId && !slot.assistantId && !slot.rcId && !slot.assignedStaffId
+        }
+        return (
+          slot.speakerId === activeEntityId ||
+          slot.assistantId === activeEntityId ||
+          slot.rcId === activeEntityId ||
+          slot.assignedStaffId === activeEntityId
+        )
+      }
+      return false
+    })
+
+    // If viewing by location or section, deduplicate operational tasks so multi-assigned tasks don't duplicate
+    if (viewType !== 'person') {
+      const seenTaskIds = new Set<string>()
+      const deduplicated: typeof filtered = []
+      for (const slot of filtered) {
+        if (slot.isOperationalTask && slot.taskId) {
+          if (seenTaskIds.has(slot.taskId)) continue
+          seenTaskIds.add(slot.taskId)
+        }
+        deduplicated.push(slot)
+      }
+      return deduplicated.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+    }
+
+    return filtered.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
   }
 
   return (
