@@ -3,6 +3,8 @@ import { Link } from '@tanstack/react-router'
 import { trpc } from '../trpc'
 import CreateClassModal from '../components/CreateClassModal'
 import EditClassModal from '../components/EditClassModal'
+import CreateShiftModal from '../components/CreateShiftModal'
+import EditShiftModal from '../components/EditShiftModal'
 import '../../styles/schedule.css'
 import '../../styles/dashboard.css'
 
@@ -48,11 +50,14 @@ function Schedule() {
   const [personSearchQuery, setPersonSearchQuery] = useState<string>('')
   const [isAutocompleteFocused, setIsAutocompleteFocused] = useState<boolean>(false)
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false)
+  const [showCreateShiftModal, setShowCreateShiftModal] = useState<boolean>(false)
   const [selectedSlotForEdit, setSelectedSlotForEdit] = useState<any | null>(null)
+  const [selectedShiftForEdit, setSelectedShiftForEdit] = useState<any | null>(null)
 
   const { data: slots, isLoading: loadingSlots, error: errorSlots } = trpc.schedules.list.useQuery()
   const { data: staffs, isLoading: loadingStaffs } = trpc.staffs.list.useQuery()
   const { data: tasks = [] } = trpc.tasks.list.useQuery()
+  const { data: shifts = [] } = trpc.shifts.list.useQuery()
 
   // Map operational tasks assigned to staff members so they show up on their schedule
   const mappedTaskSlots = useMemo(() => {
@@ -83,6 +88,28 @@ function Schedule() {
     })
     return mapped
   }, [tasks])
+
+  // Map staff shifts so they show up on personal schedule
+  const mappedShiftSlots = useMemo(() => {
+    if (!shifts || shifts.length === 0) return []
+    return shifts.map((shift: any) => ({
+      id: `shift-${shift.id}`,
+      title: `[Shift: ${shift.type || 'Staff'}]${shift.notes ? ` ${shift.notes}` : ''}`,
+      description: shift.notes || `Shift ${shift.type || ''}`,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+      location: shift.location,
+      type: 'SPECIAL' as const,
+      isShift: true,
+      shiftType: shift.type || 'Logistique',
+      assignedStaffId: shift.staffMemberId,
+      speakerId: null,
+      assistantId: null,
+      rcId: null,
+      section: null,
+      rawShift: shift,
+    }))
+  }, [shifts])
 
   const formatTime = (date: Date | string) => {
     const d = typeof date === 'string' ? new Date(date) : date
@@ -226,7 +253,7 @@ function Schedule() {
 
   // Filter slots for a given day and selected entity
   const getSlotsForDay = (dateStr: string) => {
-    const combinedSlots = [...safeSlots, ...mappedTaskSlots]
+    const combinedSlots = [...safeSlots, ...mappedTaskSlots, ...mappedShiftSlots]
     return combinedSlots
       .filter((slot) => {
         if (getSlotDateStr(slot.startTime) !== dateStr) return false
@@ -336,30 +363,27 @@ function Schedule() {
                 </div>
               )}
             </div>
+          ) : dropdownEntities.length > 0 ? (
+            <div className="entity-selector-wrapper">
+              <select
+                className="entity-select"
+                value={activeEntityId}
+                onChange={(e) => setSelectedEntityId(e.target.value)}
+              >
+                {dropdownEntities.map((entity) => (
+                  <option key={entity.id} value={entity.id}>
+                    {entity.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           ) : (
-            dropdownEntities.length > 0 ? (
-              <div className="entity-selector-wrapper">
-                <select
-                  className="entity-select"
-                  value={activeEntityId}
-                  onChange={(e) => setSelectedEntityId(e.target.value)}
-                >
-                  {dropdownEntities.map((entity) => (
-                    <option key={entity.id} value={entity.id}>
-                      {entity.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div style={{ height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem' }}>
-                Aucune entité trouvée
-              </div>
-            )
+            <div style={{ height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem' }}>
+              Aucune entité trouvée
+            </div>
           )}
         </div>
-
-        <div className="header-right-spacer" style={{ width: 'auto', display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'right', flex:1  }}>
           {viewType === 'section' && (
             <button
               className="btn-primary"
@@ -367,6 +391,15 @@ function Schedule() {
               style={{ marginTop: 0 }}
             >
               + Ajouter un cours
+            </button>
+          )}
+          {viewType === 'person' && (
+            <button
+              className="btn-primary"
+              onClick={() => setShowCreateShiftModal(true)}
+              style={{ marginTop: 0, background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)', color: 'white' }}
+            >
+              + Ajouter un shift
             </button>
           )}
           <button
@@ -383,7 +416,6 @@ function Schedule() {
           </button>
         </div>
       </div>
-
       {/* Calendar App Grid */}
       <div className="calendar-container">
         <div className="calendar-grid">
@@ -427,7 +459,13 @@ function Schedule() {
                         slot={slot}
                         style={cardStyle}
                         formatTime={formatTime}
-                        onClick={() => setSelectedSlotForEdit(slot)}
+                        onClick={() => {
+                          if (slot.isShift) {
+                            setSelectedShiftForEdit(slot)
+                          } else if (!slot.isOperationalTask) {
+                            setSelectedSlotForEdit(slot)
+                          }
+                        }}
                       />
                     )
                   })}
@@ -443,10 +481,22 @@ function Schedule() {
           onClose={() => setShowCreateModal(false)}
         />
       )}
+      {showCreateShiftModal && (
+        <CreateShiftModal
+          defaultStaffId={viewType === 'person' && activeEntityId !== 'none' ? activeEntityId : ''}
+          onClose={() => setShowCreateShiftModal(false)}
+        />
+      )}
       {selectedSlotForEdit && (
         <EditClassModal
           slot={selectedSlotForEdit}
           onClose={() => setSelectedSlotForEdit(null)}
+        />
+      )}
+      {selectedShiftForEdit && (
+        <EditShiftModal
+          shift={selectedShiftForEdit}
+          onClose={() => setSelectedShiftForEdit(null)}
         />
       )}
     </div>
@@ -461,26 +511,49 @@ interface AbsoluteSlotCardProps {
 }
 
 function AbsoluteSlotCard({ slot, style, formatTime, onClick }: AbsoluteSlotCardProps) {
-  const cardTypeClass = slot.type.toLowerCase()
+  const cardTypeClass = slot.type ? slot.type.toLowerCase() : 'special'
 
   const isOpTask = slot.isOperationalTask
-  const customStyle: React.CSSProperties = isOpTask
-    ? {
-        ...style,
-        borderLeftColor:
-          slot.category === 'LOGISTIQUE'
-            ? '#6366f1'
-            : slot.category === 'MATERIEL'
-            ? '#06b6d4'
-            : slot.category === 'ANIMATION'
-            ? '#10b981'
-            : slot.category === 'PEDAGOGIE'
-            ? '#f59e0b'
-            : '#ec4899',
-        backgroundColor: 'rgba(99, 102, 241, 0.15)',
-        color: 'white',
-      }
-    : style
+  const isShift = slot.isShift
+
+  const shiftColors: Record<string, string> = {
+    Logistique: '#ec4899',
+    Catering: '#f97316',
+    Animation: '#10b981',
+    Communication: '#06b6d4',
+    Staff: '#8b5cf6',
+    RC: '#eab308',
+    Speaker: '#3b82f6',
+    Assistanat: '#14b8a6',
+  }
+
+  let customStyle: React.CSSProperties = style
+  if (isOpTask) {
+    customStyle = {
+      ...style,
+      borderLeftColor:
+        slot.category === 'LOGISTIQUE'
+          ? '#6366f1'
+          : slot.category === 'MATERIEL'
+          ? '#06b6d4'
+          : slot.category === 'ANIMATION'
+          ? '#10b981'
+          : slot.category === 'PEDAGOGIE'
+          ? '#f59e0b'
+          : '#ec4899',
+      backgroundColor: 'rgba(99, 102, 241, 0.15)',
+      color: 'white',
+    }
+  } else if (isShift) {
+    const shiftColor = shiftColors[slot.shiftType] || '#8b5cf6'
+    customStyle = {
+      ...style,
+      borderLeftColor: shiftColor,
+      backgroundColor: 'rgba(139, 92, 246, 0.2)',
+      color: 'white',
+      cursor: 'pointer',
+    }
+  }
 
   return (
     <div
@@ -494,6 +567,11 @@ function AbsoluteSlotCard({ slot, style, formatTime, onClick }: AbsoluteSlotCard
         {isOpTask && (
           <span style={{ fontSize: '0.62rem', background: 'rgba(255, 255, 255, 0.2)', padding: '0.05rem 0.3rem', borderRadius: '3px', marginLeft: 'auto' }}>
             ⚙️ Opération
+          </span>
+        )}
+        {isShift && (
+          <span style={{ fontSize: '0.62rem', background: 'rgba(168, 85, 247, 0.3)', padding: '0.05rem 0.3rem', borderRadius: '3px', marginLeft: 'auto' }}>
+            🗓️ Shift ({slot.shiftType})
           </span>
         )}
       </div>

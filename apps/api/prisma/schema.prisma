@@ -83,6 +83,7 @@ model Shift {
   startTime     DateTime
   endTime       DateTime
   location      String?
+  type          String?
   notes         String?
   staffMember   StaffMember @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
 }

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { trpc } from '../trpc'
 import { Modal, Input, Select, Button } from '@s4s/ui'
+import StaffCombobox from './StaffCombobox'
 
 const DAYS = [
   { dateStr: '2026-08-26', label: 'Mer 26 août', fullLabel: 'Mercredi 26 août' },
@@ -43,6 +44,11 @@ function CreateClassModal({ defaultSection, onClose }: Props) {
     { id: '1', day: '2026-08-26', startTime: '08:00', endTime: '10:00', location: '' }
   ])
 
+  const [speakerId, setSpeakerId] = useState<string>('')
+  const [assistantId, setAssistantId] = useState<string>('')
+  const [rcId, setRcId] = useState<string>('')
+
+  const { data: staffs = [] } = trpc.staffs.list.useQuery()
   const createMutation = trpc.schedules.create.useMutation()
 
   const addSession = () => {
@@ -100,6 +106,9 @@ function CreateClassModal({ defaultSection, onClose }: Props) {
               endTime: new Date(endStr),
               location: sess.location || undefined,
               sectionId: sec,
+              speakerId: speakerId || undefined,
+              assistantId: assistantId || undefined,
+              rcId: rcId || undefined,
             })
           )
         }
@@ -113,7 +122,7 @@ function CreateClassModal({ defaultSection, onClose }: Props) {
   }
 
   return (
-    <Modal isOpen onClose={onClose} title="Créer un cours" size="md">
+    <Modal isOpen onClose={onClose} title="Créer un cours" size="lg">
       <form onSubmit={handleSubmit}>
         <Input
           label="Titre"
@@ -133,6 +142,32 @@ function CreateClassModal({ defaultSection, onClose }: Props) {
           <option value="SPECIAL">Spécial (Special)</option>
           <option value="MEAL">Repas (Meal)</option>
         </Select>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
+          <StaffCombobox
+            label="Speaker"
+            value={speakerId}
+            onChange={setSpeakerId}
+            placeholder="Rechercher speaker..."
+            defaultCategory="Speaker"
+          />
+
+          <StaffCombobox
+            label="Assistant"
+            value={assistantId}
+            onChange={setAssistantId}
+            placeholder="Rechercher assistant..."
+            defaultCategory="Assistant"
+          />
+
+          <StaffCombobox
+            label="RC (Responsable)"
+            value={rcId}
+            onChange={setRcId}
+            placeholder="Rechercher RC..."
+            defaultCategory="RC"
+          />
+        </div>
 
         <div style={{ marginBottom: '1rem' }}>
           <label className="s4s-label">Sections * (Sélectionnez au moins une)</label>

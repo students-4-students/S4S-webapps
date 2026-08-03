@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { trpc } from '../trpc'
 import { Modal, Input, Select, Button } from '@s4s/ui'
+import StaffCombobox from './StaffCombobox'
 
 const DAYS = [
   { dateStr: '2026-08-26', label: 'Mer 26 août', fullLabel: 'Mercredi 26 août' },
@@ -50,6 +51,11 @@ function EditClassModal({ slot, onClose }: Props) {
   const [endTime, setEndTime] = useState(formatHHMM(endObj))
   const [location, setLocation] = useState(slot.location || '')
   const [sectionId, setSectionId] = useState(slot.section?.name || 'CMS')
+  const [speakerId, setSpeakerId] = useState<string>(slot.speakerId || slot.speaker?.id || '')
+  const [assistantId, setAssistantId] = useState<string>(slot.assistantId || slot.assistant?.id || '')
+  const [rcId, setRcId] = useState<string>(slot.rcId || slot.rc?.id || '')
+
+  const { data: staffs = [] } = trpc.staffs.list.useQuery()
 
   const updateMutation = trpc.schedules.update.useMutation({
     onSuccess: () => {
@@ -79,6 +85,9 @@ function EditClassModal({ slot, onClose }: Props) {
       endTime: new Date(endStr),
       location: location || null,
       sectionId,
+      speakerId: speakerId || null,
+      assistantId: assistantId || null,
+      rcId: rcId || null,
     })
   }
 
@@ -89,7 +98,7 @@ function EditClassModal({ slot, onClose }: Props) {
   }
 
   return (
-    <Modal isOpen onClose={onClose} title="Modifier le cours" size="md">
+    <Modal isOpen onClose={onClose} title="Modifier le cours" size="lg">
       <form onSubmit={handleSubmit}>
         <Input
           label="Titre"
@@ -109,6 +118,32 @@ function EditClassModal({ slot, onClose }: Props) {
           <option value="SPECIAL">Spécial (Special)</option>
           <option value="MEAL">Repas (Meal)</option>
         </Select>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
+          <StaffCombobox
+            label="Speaker"
+            value={speakerId}
+            onChange={setSpeakerId}
+            placeholder="Rechercher speaker..."
+            defaultCategory="Speaker"
+          />
+
+          <StaffCombobox
+            label="Assistant"
+            value={assistantId}
+            onChange={setAssistantId}
+            placeholder="Rechercher assistant..."
+            defaultCategory="Assistant"
+          />
+
+          <StaffCombobox
+            label="RC (Responsable)"
+            value={rcId}
+            onChange={setRcId}
+            placeholder="Rechercher RC..."
+            defaultCategory="RC"
+          />
+        </div>
 
         <Input
           label="Salle / Lieu"
