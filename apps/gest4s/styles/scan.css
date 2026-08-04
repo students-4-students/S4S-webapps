@@ -1,0 +1,384 @@
+/* ============================================================ */
+/* Scan Page                                                    */
+/* ============================================================ */
+
+.scan-page {
+  min-height: calc(100vh - 64px);
+  background: linear-gradient(135deg, #1a1230 0%, #2d1b4e 50%, #1e1040 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem 1rem 2rem;
+  gap: 1.5rem;
+}
+
+/* ── Stats bar ─────────────────────────────────────────────── */
+.scan-stats-bar {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.scan-stat-pill {
+  flex: 1;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 0.65rem 1rem;
+  text-align: center;
+  backdrop-filter: blur(8px);
+}
+
+.scan-stat-pill .stat-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+
+.scan-stat-pill .stat-label {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 0.2rem;
+}
+
+.scan-stat-pill.pill-a .stat-value { color: #34d399; }
+.scan-stat-pill.pill-b .stat-value { color: #60a5fa; }
+
+/* ── Entrance selector ─────────────────────────────────────── */
+.entrance-selector {
+  width: 100%;
+  max-width: 560px;
+}
+
+.entrance-selector h2 {
+  color: rgba(255,255,255,0.6);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 0.6rem;
+  text-align: center;
+}
+
+.entrance-buttons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.entrance-btn {
+  flex: 1;
+  padding: 1rem;
+  border-radius: 14px;
+  border: 2px solid transparent;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.entrance-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.2s;
+  background: rgba(255,255,255,0.15);
+}
+
+.entrance-btn:hover::before { opacity: 1; }
+
+.entrance-btn-a {
+  background: linear-gradient(135deg, #065f46, #047857);
+  color: #6ee7b7;
+  border-color: #34d399;
+  box-shadow: 0 0 0 0 rgba(52, 211, 153, 0);
+}
+
+.entrance-btn-a.active {
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: #fff;
+  box-shadow: 0 0 24px rgba(52, 211, 153, 0.5), 0 0 0 3px rgba(52, 211, 153, 0.3);
+}
+
+.entrance-btn-b {
+  background: linear-gradient(135deg, #1e3a8a, #1d4ed8);
+  color: #93c5fd;
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 0 rgba(96, 165, 250, 0);
+}
+
+.entrance-btn-b.active {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: #fff;
+  box-shadow: 0 0 24px rgba(96, 165, 250, 0.5), 0 0 0 3px rgba(96, 165, 250, 0.3);
+}
+
+.entrance-btn .btn-group-label {
+  display: block;
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.entrance-btn .btn-sub {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 500;
+  opacity: 0.8;
+  margin-top: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ── Scanner container ─────────────────────────────────────── */
+.scanner-wrapper {
+  width: 100%;
+  max-width: 560px;
+  position: relative;
+}
+
+.scanner-card {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 20px;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+}
+
+.scanner-header {
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.scanner-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 8px #22c55e;
+  animation: pulse-dot 2s ease infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.scanner-header span {
+  color: rgba(255,255,255,0.7);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.scanner-entrance-badge {
+  margin-left: auto;
+  padding: 0.25rem 0.75rem;
+  border-radius: 99px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.scanner-entrance-badge.badge-a {
+  background: rgba(52, 211, 153, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+}
+
+.scanner-entrance-badge.badge-b {
+  background: rgba(96, 165, 250, 0.2);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.4);
+}
+
+.scanner-inner {
+  position: relative;
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* html5-qrcode default element styling overrides */
+#qr-reader {
+  width: 100% !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+#qr-reader video {
+  width: 100% !important;
+  border-radius: 0 !important;
+}
+
+#qr-reader__scan_region {
+  background: transparent !important;
+}
+
+#qr-reader__dashboard {
+  padding: 0.5rem !important;
+  background: rgba(0,0,0,0.3) !important;
+}
+
+#qr-reader__dashboard button {
+  background: rgba(255,255,255,0.15) !important;
+  color: white !important;
+  border: 1px solid rgba(255,255,255,0.3) !important;
+  border-radius: 8px !important;
+  padding: 0.4rem 0.8rem !important;
+  margin: 0.25rem !important;
+}
+
+#qr-reader__dashboard select {
+  background: rgba(0,0,0,0.5) !important;
+  color: white !important;
+  border: 1px solid rgba(255,255,255,0.3) !important;
+  border-radius: 6px !important;
+  padding: 0.3rem 0.5rem !important;
+}
+
+/* ── No entrance selected overlay ──────────────────────────── */
+.scanner-no-entrance {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  z-index: 10;
+  border-radius: 0 0 20px 20px;
+}
+
+.scanner-no-entrance p {
+  color: rgba(255,255,255,0.6);
+  font-size: 0.9rem;
+  margin: 0;
+  text-align: center;
+}
+
+.scanner-no-entrance .arrow-up {
+  font-size: 2rem;
+  animation: bounce-up 1.2s ease infinite;
+}
+
+@keyframes bounce-up {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* ── Feedback overlay ───────────────────────────────────────── */
+.scan-feedback {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: feedback-in 0.2s ease;
+}
+
+@keyframes feedback-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.scan-feedback.feedback-ok      { background: rgba(5, 150, 105, 0.92); }
+.scan-feedback.feedback-error   { background: rgba(220, 38, 38, 0.92); }
+.scan-feedback.feedback-warning { background: rgba(217, 119, 6, 0.92); }
+
+.feedback-content {
+  text-align: center;
+  color: white;
+  padding: 2rem;
+  max-width: 400px;
+}
+
+.feedback-icon {
+  font-size: 5rem;
+  line-height: 1;
+  margin-bottom: 1rem;
+  display: block;
+}
+
+.feedback-title {
+  font-size: 2rem;
+  font-weight: 800;
+  margin: 0 0 0.5rem;
+}
+
+.feedback-name {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+  opacity: 0.95;
+}
+
+.feedback-detail {
+  font-size: 0.95rem;
+  opacity: 0.8;
+  margin: 0;
+}
+
+.feedback-badge {
+  display: inline-block;
+  margin-top: 0.75rem;
+  padding: 0.3rem 1rem;
+  border-radius: 99px;
+  background: rgba(255,255,255,0.2);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* ── Last scan result ───────────────────────────────────────── */
+.last-scan {
+  width: 100%;
+  max-width: 560px;
+  border-radius: 14px;
+  padding: 0.9rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid;
+  transition: all 0.3s ease;
+}
+
+.last-scan.result-ok      { background: rgba(5,150,105,0.15); border-color: rgba(52,211,153,0.3); }
+.last-scan.result-error   { background: rgba(220,38,38,0.15);  border-color: rgba(248,113,113,0.3); }
+.last-scan.result-warning { background: rgba(217,119,6,0.15);  border-color: rgba(251,191,36,0.3); }
+
+.last-scan-icon { font-size: 1.75rem; flex-shrink: 0; }
+
+.last-scan-info { flex: 1; min-width: 0; }
+
+.last-scan-name {
+  font-weight: 700;
+  color: #fff;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.last-scan-detail {
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.6);
+  margin-top: 0.1rem;
+}
+
+.last-scan-time {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.4);
+  flex-shrink: 0;
+}

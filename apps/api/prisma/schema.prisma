@@ -25,6 +25,7 @@ model User {
   assignedIncidents     Incident[]             @relation("AssignedIncidents")
   workshopRegistrations WorkshopRegistration[]
   firstDayGroup         String?
+  QRScannedAt           DateTime?
 }
 
 model Section {
