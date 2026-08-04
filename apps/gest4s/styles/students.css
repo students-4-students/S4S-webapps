@@ -29,7 +29,6 @@
   align-items: center;
   gap: 1rem;
   width: 100%;
-  max-width: 800px;
   margin-bottom: 1.5rem;
 }
 
@@ -71,7 +70,6 @@
   flex: 1;
   overflow-y: auto;
   border-radius: 0.5rem;
-  border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .student-table {

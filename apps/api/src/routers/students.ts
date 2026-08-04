@@ -52,6 +52,7 @@ export const studentsRouter = router({
         lastName: z.string().min(1),
         email: z.string().email(),
         sectionName: z.string().optional().nullable(),
+        firstDayGroup: z.enum(['A', 'B']).optional().nullable(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -68,6 +69,7 @@ export const studentsRouter = router({
           password: hashedPassword,
           role: 'PARTICIPANT',
           sectionId: sectionId,
+          firstDayGroup: input.firstDayGroup ?? null,
         },
         include: {
           section: true,
@@ -99,6 +101,7 @@ export const studentsRouter = router({
         lastName: z.string().min(1).optional(),
         email: z.string().email().optional(),
         sectionName: z.string().optional().nullable(),
+        firstDayGroup: z.enum(['A', 'B']).optional().nullable(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -188,6 +191,28 @@ export const studentsRouter = router({
 
       studentsEmitter.emit('updated')
       return createdStudents
+    }),
+
+  updateMany: staffProcedure
+    .input(
+      z.array(
+        z.object({
+          id: z.string(),
+          firstDayGroup: z.enum(['A', 'B']).nullable().optional(),
+        })
+      )
+    )
+    .mutation(async ({ input, ctx }) => {
+      await ctx.db.$transaction(
+        input.map(({ id, firstDayGroup }) =>
+          ctx.db.user.update({
+            where: { id },
+            data: { firstDayGroup: firstDayGroup ?? null },
+          })
+        )
+      )
+      studentsEmitter.emit('updated')
+      return { updated: input.length }
     }),
 
   resetPassword: staffProcedure

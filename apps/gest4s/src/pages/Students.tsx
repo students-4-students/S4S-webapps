@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Link } from '@tanstack/react-router'
 import { trpc } from '../trpc'
 import {
   Modal,
@@ -24,12 +23,14 @@ export default function Students() {
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [sectionName, setSectionName] = useState('')
+  const [firstDayGroup, setFirstDayGroup] = useState<'A' | 'B' | ''>('')
 
   // Edit Form State
   const [editFirstName, setEditFirstName] = useState('')
   const [editLastName, setEditLastName] = useState('')
   const [editEmail, setEditEmail] = useState('')
   const [editSectionName, setEditSectionName] = useState('')
+  const [editFirstDayGroup, setEditFirstDayGroup] = useState<'A' | 'B' | ''>('')
 
   const utils = trpc.useUtils()
 
@@ -50,6 +51,7 @@ export default function Students() {
   const createMutation = trpc.students.create.useMutation()
   const importMutation = trpc.students.importStudents.useMutation()
   const updateMutation = trpc.students.update.useMutation()
+  const updateManyMutation = trpc.students.updateMany.useMutation()
   const deleteMutation = trpc.students.delete.useMutation()
   const resetPasswordMutation = trpc.students.resetPassword.useMutation()
 
@@ -67,6 +69,7 @@ export default function Students() {
         lastName,
         email,
         sectionName: sectionName || null,
+        firstDayGroup: (firstDayGroup as 'A' | 'B') || null,
       })
 
       setShowAddModal(false)
@@ -82,6 +85,7 @@ export default function Students() {
       setLastName('')
       setEmail('')
       setSectionName('')
+      setFirstDayGroup('')
       utils.students.list.invalidate()
     } catch (err: any) {
       console.error(err)
@@ -95,6 +99,7 @@ export default function Students() {
     setEditLastName(student.lastName)
     setEditEmail(student.email)
     setEditSectionName(student.section?.name || '')
+    setEditFirstDayGroup((student.firstDayGroup as 'A' | 'B') || '')
     setShowEditModal(true)
   }
 
@@ -108,6 +113,7 @@ export default function Students() {
         lastName: editLastName,
         email: editEmail,
         sectionName: editSectionName || null,
+        firstDayGroup: (editFirstDayGroup as 'A' | 'B') || null,
       })
       alert('Étudiant modifié avec succès !')
       setShowEditModal(false)
@@ -186,6 +192,84 @@ export default function Students() {
     reader.readAsText(file)
   }
 
+  const setGroupForAllStudents = async () => {
+    if (!window.confirm(`Voulez-vous vraiment définir le groupe du premier jour pour tous les étudiants ?`)) return
+
+    try {
+      const studentsToAssign = students.filter((s) => !s.firstDayGroup)
+      if (studentsToAssign.length === 0) {
+        alert('Tous les étudiants ont déjà un groupe défini.')
+        return
+      }
+
+      // Group unassigned students by section key
+      const bySection: Record<string, typeof students> = {}
+      studentsToAssign.forEach((student) => {
+        const key = student.section?.name || '__no_section__'
+        if (!bySection[key]) bySection[key] = []
+        bySection[key].push(student)
+      })
+
+      // Count existing A/B per section (including already-assigned students)
+      const existingCounts: Record<string, { A: number; B: number }> = {}
+      let totalExistingA = 0
+      let totalExistingB = 0
+      students.forEach((student) => {
+        const key = student.section?.name || '__no_section__'
+        if (!existingCounts[key]) existingCounts[key] = { A: 0, B: 0 }
+        if (student.firstDayGroup === 'A') { existingCounts[key].A++; totalExistingA++ }
+        else if (student.firstDayGroup === 'B') { existingCounts[key].B++; totalExistingB++ }
+      })
+
+      // Pass 1: floor the ideal newA per section.
+      // idealNewA[section] = (existingB - existingA + u) / 2  → sections with odd (u + existingB - existingA) have a remainder.
+      type SectionSplit = { key: string; unassigned: typeof students; floorA: number; hasRemainder: boolean }
+      const splits: SectionSplit[] = []
+      let totalFloorA = 0
+
+      Object.entries(bySection).forEach(([key, unassigned]) => {
+        const { A: existingA, B: existingB } = existingCounts[key] || { A: 0, B: 0 }
+        const u = unassigned.length
+        const raw = existingB - existingA + u          // numerator (must divide by 2)
+        const floorA = Math.max(0, Math.min(u, Math.floor(raw / 2)))
+        const hasRemainder = raw % 2 !== 0             // true when ideal is x.5
+        splits.push({ key, unassigned, floorA, hasRemainder })
+        totalFloorA += floorA
+      })
+
+      // Pass 2: decide how many of the "remainder" sections should round UP to minimise global imbalance.
+      // Global target: (totalExistingA + targetNewA) ≈ (totalExistingB + totalUnassigned - targetNewA)
+      //   => targetNewA = round((totalExistingB - totalExistingA + totalUnassigned) / 2)
+      const totalUnassigned = studentsToAssign.length
+      const targetNewA = Math.round((totalExistingB - totalExistingA + totalUnassigned) / 2)
+      let extraABudget = Math.max(0, targetNewA - totalFloorA)   // how many remainder sections get +1 A
+
+      const updatedStudents: { id: string; firstDayGroup: 'A' | 'B' }[] = []
+
+      splits.forEach(({ unassigned, floorA, hasRemainder }) => {
+        let newACount = floorA
+        if (hasRemainder && extraABudget > 0) {
+          newACount++   // round up this section
+          extraABudget--
+        }
+        unassigned.forEach((student, i) => {
+          updatedStudents.push({
+            id: student.id,
+            firstDayGroup: i < newACount ? 'A' : 'B',
+          })
+        })
+      })
+
+      // Update all students in a single mutation
+      await updateManyMutation.mutateAsync(updatedStudents)
+      alert('Groupes du premier jour mis à jour pour tous les étudiants.')
+      utils.students.list.invalidate()
+    } catch (err: any) {
+      console.error(err)
+      alert("Erreur lors de la mise à jour des groupes: " + (err.message || err))
+    }
+  }
+
   return (
     <div className="students-page">
       <PageHeader
@@ -205,18 +289,14 @@ export default function Students() {
                 onChange={handleCsvImport}
               />
             </label>
+            <Button variant="secondary" onClick={() => setGroupForAllStudents()}>
+              Définir le groupe du premier jour pour tous les étudiants
+            </Button>
           </div>
         }
       />
 
-      <div className="search-controls" style={{ marginBottom: '1.25rem' }}>
-        <SearchInput
-          placeholder="Rechercher par nom, prénom, email ou section..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          onClear={() => setSearchTerm('')}
-        />
-      </div>
+      
 
       <div className="table-card">
         {isLoading ? (
@@ -225,6 +305,14 @@ export default function Students() {
           </p>
         ) : (
           <div className="table-container">
+            <div className="search-controls" style={{ marginBottom: '1.25rem', width: '100%' }}>
+              <SearchInput
+                placeholder="Rechercher par nom, prénom, email ou section..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onClear={() => setSearchTerm('')}
+              />
+            </div>
             <table className="student-table">
               <thead>
                 <tr>
@@ -232,6 +320,7 @@ export default function Students() {
                   <th>Nom</th>
                   <th>Email</th>
                   <th>Section</th>
+                  <th>Groupe</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -243,6 +332,7 @@ export default function Students() {
                       <td>{student.lastName}</td>
                       <td>{student.email}</td>
                       <td>{student.section?.name || '—'}</td>
+                      <td>{student.firstDayGroup || '—'}</td>
                       <td>
                         <div className="action-buttons">
                           <button className="btn-icon" onClick={() => handleEditClick(student)}>
@@ -311,6 +401,33 @@ export default function Students() {
               ))}
             </datalist>
           </div>
+          <div>
+            <label className="s4s-label">Groupe du premier jour (optionnel)</label>
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+              {(['A', 'B'] as const).map((grp) => (
+                <label key={grp} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="firstDayGroup"
+                    value={grp}
+                    checked={firstDayGroup === grp}
+                    onChange={() => setFirstDayGroup(grp)}
+                  />
+                  <span style={{ fontWeight: 600 }}>{grp}</span>
+                </label>
+              ))}
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="firstDayGroup"
+                  value=""
+                  checked={firstDayGroup === ''}
+                  onChange={() => setFirstDayGroup('')}
+                />
+                <span style={{ color: 'var(--s4s-text-muted)', fontSize: '0.875rem' }}>Aucun</span>
+              </label>
+            </div>
+          </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
             <Button type="button" variant="secondary" onClick={() => setShowAddModal(false)}>
@@ -363,6 +480,34 @@ export default function Students() {
               onChange={(e) => setEditSectionName(e.target.value)}
               list="sections-list"
             />
+          </div>
+
+          <div style={{ marginTop: '0.5rem' }}>
+            <label className="s4s-label">Groupe du premier jour (optionnel)</label>
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+              {(['A', 'B'] as const).map((grp) => (
+                <label key={grp} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="editFirstDayGroup"
+                    value={grp}
+                    checked={editFirstDayGroup === grp}
+                    onChange={() => setEditFirstDayGroup(grp)}
+                  />
+                  <span style={{ fontWeight: 600 }}>{grp}</span>
+                </label>
+              ))}
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="editFirstDayGroup"
+                  value=""
+                  checked={editFirstDayGroup === ''}
+                  onChange={() => setEditFirstDayGroup('')}
+                />
+                <span style={{ color: 'var(--s4s-text-muted)', fontSize: '0.875rem' }}>Aucun</span>
+              </label>
+            </div>
           </div>
 
           <div
