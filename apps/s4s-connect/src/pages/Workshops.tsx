@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Link } from '@tanstack/react-router'
 import { trpc } from '../trpc'
 import { useAuthStore } from '../store/auth'
@@ -38,6 +38,7 @@ export default function Workshops() {
   const [registrationFilter, setRegistrationFilter] = useState<'all' | 'required' | 'open'>('all')
   const [timeFilter, setTimeFilter] = useState<'all' | 'upcoming' | 'past'>('all')
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [selectedWorkshop, setSelectedWorkshop] = useState<Workshop | null>(null)
 
   const utils = trpc.useUtils()
   const user = useAuthStore((state) => state.user)
@@ -72,7 +73,6 @@ export default function Workshops() {
       workshops.forEach((w: any) => {
         (w.dates || []).forEach((d: any) => {
           if (d.registrations && d.registrations.length > 0) {
-            // Check if current user is registered or if saved locally
             const isUserReg = d.registrations.some((r: any) => r.sessionId === d.id || registeredSlotIds.includes(d.id))
             if (isUserReg) {
               dbRegisteredIds.push(d.id)
@@ -86,42 +86,53 @@ export default function Workshops() {
     }
   }, [workshops])
 
-  // tRPC Mutations for DB registration
+  // Keep selected workshop in sync with fresh data
+  useEffect(() => {
+    if (selectedWorkshop && workshops.length > 0) {
+      const fresh = workshops.find((w: any) => w.id === selectedWorkshop.id)
+      if (fresh) setSelectedWorkshop(fresh as Workshop)
+    }
+  }, [workshops])
+
+  // Close on Escape key + scroll lock
+  const closeDetail = useCallback(() => setSelectedWorkshop(null), [])
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') closeDetail() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [closeDetail])
+  useEffect(() => {
+    if (selectedWorkshop) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [selectedWorkshop])
+
+  // tRPC Mutations
   const registerMutation = trpc.workshops.register.useMutation({
-    onSuccess: () => {
-      utils.workshops.list.invalidate()
-    },
+    onSuccess: () => { utils.workshops.list.invalidate() },
     onError: (err) => {
-      setToastMessage(err.message || 'Erreur lors de l’inscription')
+      setToastMessage(err.message || 'Erreur lors de l\'inscription')
       setTimeout(() => setToastMessage(null), 3500)
     },
   })
-
   const unregisterMutation = trpc.workshops.unregister.useMutation({
-    onSuccess: () => {
-      utils.workshops.list.invalidate()
-    },
+    onSuccess: () => { utils.workshops.list.invalidate() },
     onError: (err) => {
       setToastMessage(err.message || 'Erreur lors de la désinscription')
       setTimeout(() => setToastMessage(null), 3500)
     },
   })
 
-  // Real-time Subscription to live updates
+  // Real-time subscription
   trpc.workshops.onUpdated.useSubscription(undefined, {
-    onData: () => {
-      utils.workshops.list.invalidate()
-    },
-    onError: (err) => {
-      console.error('[DEBUG] Workshops subscription error:', err)
-    },
+    onData: () => { utils.workshops.list.invalidate() },
+    onError: (err) => { console.error('[DEBUG] Workshops subscription error:', err) },
   })
 
-  // Accurate available spots computed from database registrations
-  const getSlotAvailableSpots = (
-    session: WorkshopSession,
-    maxParticipants: number | null
-  ) => {
+  const getSlotAvailableSpots = (session: WorkshopSession, maxParticipants: number | null) => {
     if (!maxParticipants || maxParticipants <= 0) return null
     const taken = session.registrations ? session.registrations.length : 0
     const available = Math.max(0, maxParticipants - taken)
@@ -137,61 +148,60 @@ export default function Workshops() {
     if (isRegistered) {
       unregisterMutation.mutate({ sessionId: session.id, email: userEmail })
       setRegisteredSlotIds((prev) => prev.filter((id) => id !== session.id))
-      setToastMessage(`Inscription annulée pour la session de "${workshop.title}"`)
+      setToastMessage(`Inscription annulée pour "${workshop.title}"`)
     } else {
-      registerMutation.mutate({
-        sessionId: session.id,
-        firstName: userFirstName,
-        lastName: userLastName,
-        email: userEmail,
-      })
+      registerMutation.mutate({ sessionId: session.id, firstName: userFirstName, lastName: userLastName, email: userEmail })
       setRegisteredSlotIds((prev) => Array.from(new Set([...prev, session.id])))
       setToastMessage(`Inscription réussie à "${workshop.title}" !`)
     }
     setTimeout(() => setToastMessage(null), 3500)
   }
 
-  // Filtered Workshops
+  // Filtered workshops
   const filteredWorkshops = useMemo(() => {
     const now = new Date().getTime()
-
     return workshops.filter((w) => {
-      // Search filter
       const matchesSearch =
         !searchQuery ||
         w.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         w.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
         w.description.toLowerCase().includes(searchQuery.toLowerCase())
-
-      // Registration filter
       const matchesReg =
         registrationFilter === 'all' ||
         (registrationFilter === 'required' && w.requiresRegistration) ||
         (registrationFilter === 'open' && !w.requiresRegistration)
-
-      // Time filter
       let matchesTime = true
       if (timeFilter !== 'all') {
-        const hasUpcomingSession = w.dates.some((d) => new Date(d.endTime).getTime() > now)
-        if (timeFilter === 'upcoming') {
-          matchesTime = hasUpcomingSession
-        } else if (timeFilter === 'past') {
-          matchesTime = !hasUpcomingSession
-        }
+        const hasUpcoming = w.dates.some((d) => new Date(d.endTime).getTime() > now)
+        matchesTime = timeFilter === 'upcoming' ? hasUpcoming : !hasUpcoming
       }
-
       return matchesSearch && matchesReg && matchesTime
     })
   }, [workshops, searchQuery, registrationFilter, timeFilter])
 
   const hasActiveFilters = searchQuery !== '' || registrationFilter !== 'all' || timeFilter !== 'all'
+  const resetFilters = () => { setSearchQuery(''); setRegistrationFilter('all'); setTimeFilter('all') }
 
-  const resetFilters = () => {
-    setSearchQuery('')
-    setRegistrationFilter('all')
-    setTimeFilter('all')
-  }
+  // Split: today vs rest
+  const { todayWorkshops, otherWorkshops } = useMemo(() => {
+    const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
+    const today: Workshop[] = []
+    const other: Workshop[] = []
+    filteredWorkshops.forEach((w) => {
+      const hasToday = w.dates.some((d) => {
+        const s = new Date(d.startTime).getTime()
+        const e = new Date(d.endTime).getTime()
+        return s < todayEnd.getTime() && e > todayStart.getTime()
+      })
+      if (hasToday) today.push(w)
+      else other.push(w)
+    })
+    return { todayWorkshops: today, otherWorkshops: other }
+  }, [filteredWorkshops])
 
+  // ── Loading ────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="workshops-connect-container">
@@ -228,66 +238,66 @@ export default function Workshops() {
 
   return (
     <div className="workshops-connect-container">
-      {/* Notification Toast */}
+      {/* Toast */}
       {toastMessage && (
         <div className="toast-notification">
           <span>{toastMessage}</span>
         </div>
       )}
 
+      {/* Detail panel (modal on desktop, sheet on mobile) */}
+      {selectedWorkshop && (
+        <WorkshopDetail
+          workshop={selectedWorkshop}
+          registeredSlotIds={registeredSlotIds}
+          getSlotAvailableSpots={getSlotAvailableSpots}
+          onRegisterToggle={handleSlotRegisterToggle}
+          onClose={closeDetail}
+        />
+      )}
+
       {/* Header */}
       <div className="workshops-connect-header">
-        <h1>Ateliers & Workshops</h1>
-        <p className="subtitle">Découvrez et participez aux ateliers de la semaine d'intégration</p>
+        <h1>Workshops</h1>
+        <p className="subtitle">Découvrez et participez aux ateliers organisés par les différentes associations de l'EPFL</p>
       </div>
 
-      {/* Toolbar & Filters */}
+      {/* Toolbar */}
       <div className="workshops-connect-toolbar">
         <div className="search-box">
-          <span className="search-icon">🔍</span>
+          <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
           <input
+            id="workshops-search"
             type="text"
-            placeholder="Rechercher un atelier..."
+            placeholder="Rechercher un atelier…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
           {searchQuery && (
-            <button className="clear-search-btn" onClick={() => setSearchQuery('')}>
-              ✕
+            <button className="clear-search-btn" onClick={() => setSearchQuery('')} aria-label="Effacer">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
             </button>
           )}
         </div>
-
         <div className="filters-row">
-          <select
-            value={registrationFilter}
-            onChange={(e) => setRegistrationFilter(e.target.value as any)}
-            className="filter-select-connect"
-          >
-            <option value="all">Toutes les inscriptions</option>
-            <option value="open">🟢 Entrée libre</option>
-            <option value="required">📝 Inscription requise</option>
-          </select>
-
-          <select
-            value={timeFilter}
-            onChange={(e) => setTimeFilter(e.target.value as any)}
-            className="filter-select-connect"
-          >
+          <button className={`filter-chip ${registrationFilter === 'all' ? 'active' : ''}`} onClick={() => setRegistrationFilter('all')}>Tous</button>
+          <button className={`filter-chip ${registrationFilter === 'open' ? 'active' : ''}`} onClick={() => setRegistrationFilter('open')}>Entrée libre</button>
+          <button className={`filter-chip ${registrationFilter === 'required' ? 'active' : ''}`} onClick={() => setRegistrationFilter('required')}>Inscription</button>
+          <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value as any)} className="filter-select-connect" style={{ flex: 'none', minWidth: '0', width: 'auto' }}>
             <option value="all">Toutes les sessions</option>
-            <option value="upcoming">⏳ À venir / En cours</option>
-            <option value="past">🏁 Passées</option>
+            <option value="upcoming">À venir</option>
+            <option value="past">Passées</option>
           </select>
-
-          {hasActiveFilters && (
-            <button className="btn-reset-connect" onClick={resetFilters}>
-              Effacer
-            </button>
-          )}
+          {hasActiveFilters && <button className="btn-reset-connect" onClick={resetFilters}>Effacer</button>}
+          <span className="workshops-results-count">{filteredWorkshops.length} atelier{filteredWorkshops.length !== 1 ? 's' : ''}</span>
         </div>
       </div>
 
-      {/* Workshops Grid */}
+      {/* Grid */}
       {filteredWorkshops.length === 0 ? (
         <div className="empty-state-connect">
           <div className="empty-icon">🎨</div>
@@ -295,9 +305,7 @@ export default function Workshops() {
             <>
               <h3>Aucun atelier ne correspond à votre recherche</h3>
               <p>Essayez de modifier vos filtres.</p>
-              <button className="btn-primary" onClick={resetFilters}>
-                Réinitialiser les filtres
-              </button>
+              <button className="btn-primary" onClick={resetFilters}>Réinitialiser les filtres</button>
             </>
           ) : (
             <>
@@ -307,139 +315,284 @@ export default function Workshops() {
           )}
         </div>
       ) : (
-        <div className="workshops-connect-grid">
-          {filteredWorkshops.map((w: Workshop) => {
-            const sortedDates = [...(w.dates || [])].sort(
-              (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-            )
-
-            return (
-              <div key={w.id} className="workshop-connect-card">
-                <div className="workshop-card-image-wrap">
-                  {w.image ? (
-                    <img
-                      src={w.image}
-                      alt={w.title}
-                      className="workshop-card-img"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none'
-                      }}
-                    />
-                  ) : (
-                    <div className="workshop-card-placeholder">
-                      <span>🎨</span>
-                    </div>
-                  )}
-
-                  <div className="workshop-badge-container">
-                    {w.requiresRegistration ? (
-                      <span className="badge-reg required">
-                        📝 Inscription {w.maxParticipants ? `(${w.maxParticipants} max/créneau)` : ''}
-                      </span>
-                    ) : (
-                      <span className="badge-reg open">🟢 Entrée libre</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="workshop-card-body">
-                  <h3 className="workshop-card-title">{w.title}</h3>
-
-                  <div className="workshop-card-location">
-                    📍 <span>{w.location}</span>
-                    <Link
-                      to="/map"
-                      search={{ places: w.location.split(' ')[0] } as any}
-                      className="link-map-inline"
-                      title="Voir sur la carte"
-                    >
-                      🗺️
-                    </Link>
-                  </div>
-
-                  <p className="workshop-card-desc">{w.description}</p>
-
-                  <div className="workshop-card-slots-section">
-                    <span className="slots-label">
-                      📅 Créneaux disponibles ({sortedDates.length})
-                    </span>
-                    <div className="slots-list">
-                      {sortedDates.length === 0 ? (
-                        <p className="no-slots-text">Aucun créneau défini</p>
-                      ) : (
-                        sortedDates.map((d, idx) => {
-                          const isRegisteredForSlot = registeredSlotIds.includes(d.id)
-                          const spotsInfo = getSlotAvailableSpots(d, w.maxParticipants)
-
-                          return (
-                            <div
-                              key={d.id}
-                              className={`slot-option-card ${isRegisteredForSlot ? 'registered' : ''}`}
-                            >
-                              <div className="slot-info">
-                                <div className="slot-time">
-                                  <span className="slot-num">Créneau {idx + 1} :</span>
-                                  {formatDateTimeRange(d.startTime, d.endTime)}
-                                </div>
-
-                                <div className="slot-spots-badge">
-                                  {spotsInfo === null ? (
-                                    <span className="spots-tag open">🟢 Entrée libre</span>
-                                  ) : spotsInfo.available === 0 && !isRegisteredForSlot ? (
-                                    <span className="spots-tag full">
-                                      🔴 0 / {spotsInfo.max} place(s) (Complet)
-                                    </span>
-                                  ) : spotsInfo.available <= 3 ? (
-                                    <span className="spots-tag low">
-                                      🟠 {spotsInfo.available} / {spotsInfo.max} place(s) disponible(s)
-                                    </span>
-                                  ) : (
-                                    <span className="spots-tag available">
-                                      🟢 {spotsInfo.available} / {spotsInfo.max} place(s) disponible(s)
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-
-                              <button
-                                className={`btn-slot-register ${isRegisteredForSlot ? 'registered' : ''}`}
-                                disabled={
-                                  spotsInfo !== null &&
-                                  spotsInfo.available === 0 &&
-                                  !isRegisteredForSlot
-                                }
-                                onClick={() => handleSlotRegisterToggle(w, d)}
-                              >
-                                {isRegisteredForSlot ? (
-                                  <>
-                                    <span className="reg-icon">✓</span>
-                                    <span className="reg-status-label">Inscrit(e)</span>
-                                    <span className="reg-hover-label">Désinscrire</span>
-                                  </>
-                                ) : spotsInfo !== null && spotsInfo.available === 0 ? (
-                                  <span>Complet</span>
-                                ) : (
-                                  <>
-                                    <span className="reg-icon">✍️</span>
-                                    <span>S'inscrire</span>
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          )
-                        })
-                      )}
-                    </div>
-                  </div>
-                </div>
+        <>
+          {todayWorkshops.length > 0 && (
+            <>
+              <div className="workshops-section-label">
+                <h2>Aujourd'hui</h2>
+                <span className="today-badge">En cours</span>
               </div>
-            )
-          })}
-        </div>
+              <div className="workshops-connect-grid">
+                {todayWorkshops.map((w) => (
+                  <WorkshopCard
+                    key={w.id}
+                    workshop={w}
+                    registeredSlotIds={registeredSlotIds}
+                    getSlotAvailableSpots={getSlotAvailableSpots}
+                    onRegisterToggle={handleSlotRegisterToggle}
+                    onClick={() => setSelectedWorkshop(w)}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+          {otherWorkshops.length > 0 && (
+            <>
+              {todayWorkshops.length > 0 && (
+                <>
+                  <hr className="workshops-section-divider" />
+                  <div className="workshops-section-label">
+                    <h2>Autres ateliers</h2>
+                  </div>
+                </>
+              )}
+              <div className="workshops-connect-grid">
+                {otherWorkshops.map((w) => (
+                  <WorkshopCard
+                    key={w.id}
+                    workshop={w}
+                    registeredSlotIds={registeredSlotIds}
+                    getSlotAvailableSpots={getSlotAvailableSpots}
+                    onRegisterToggle={handleSlotRegisterToggle}
+                    onClick={() => setSelectedWorkshop(w)}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </>
       )}
     </div>
   )
 }
 
+// ── Workshop Card ──────────────────────────────────────────────
+interface CardProps {
+  workshop: Workshop
+  registeredSlotIds: string[]
+  getSlotAvailableSpots: (s: WorkshopSession, max: number | null) => { taken: number; available: number; max: number } | null
+  onRegisterToggle: (w: Workshop, s: WorkshopSession) => void
+  onClick: () => void
+}
 
+function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, onRegisterToggle, onClick }: CardProps) {
+  const now = Date.now()
+  const sortedDates = [...(w.dates || [])]
+    .sort((a, b) => {
+      const aIsPast = new Date(a.endTime).getTime() < now
+      const bIsPast = new Date(b.endTime).getTime() < now
+      if (aIsPast !== bIsPast) return aIsPast ? 1 : -1  // upcoming first
+      return new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+    })
+  const displayedDates = sortedDates.slice(0, 3)
+  const hiddenCount = sortedDates.length - displayedDates.length
 
+  return (
+    <div className="workshop-connect-card" onClick={onClick} style={{ cursor: 'pointer' }}>
+      <div className="workshop-card-image-wrap">
+        {w.image ? (
+          <img src={w.image} alt={w.title} className="workshop-card-img" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+        ) : (
+          <div className="workshop-card-placeholder"><span>🎨</span></div>
+        )}
+        <div className="workshop-badge-container">
+          {w.requiresRegistration ? (
+            <span className="badge-reg required">Inscription requise{w.maxParticipants ? ` · ${w.maxParticipants} max` : ''}</span>
+          ) : (
+            <span className="badge-reg open">Entrée libre</span>
+          )}
+        </div>
+      </div>
+
+      <div className="workshop-card-body">
+        <h3 className="workshop-card-title">{w.title}</h3>
+        <div className="workshop-card-location">
+          <span>📍</span>
+          <span>{w.location}</span>
+        </div>
+        <p className="workshop-card-desc">{w.description}</p>
+
+        <div className="workshop-card-slots-section">
+          <span className="slots-label">{sortedDates.length} créneau{sortedDates.length !== 1 ? 'x' : ''}</span>
+          <div className="slots-list">
+            {displayedDates.length === 0 ? (
+              <p className="no-slots-text">Aucun créneau défini</p>
+            ) : (
+              <>
+                {displayedDates.map((d, idx) => {
+                const isReg = registeredSlotIds.includes(d.id)
+                const spots = getSlotAvailableSpots(d, w.maxParticipants)
+                const isPast = new Date(d.endTime).getTime() < Date.now()
+                return (
+                  <div key={d.id} className={`slot-option-card ${isReg ? 'registered' : ''} ${isPast ? 'past' : ''}`} onClick={(e) => e.stopPropagation()}>
+                    <div className="slot-info">
+                      <div className="slot-time">
+                        <span className="slot-num">#{idx + 1}</span>
+                        {formatDateTimeRange(d.startTime, d.endTime)}
+                      </div>
+                      <div className="slot-spots-badge">
+                        {isPast ? (
+                          <span className="spots-tag past">Terminé</span>
+                        ) : spots === null ? (
+                          <span className="spots-tag open">Entrée libre</span>
+                        ) : spots.available === 0 && !isReg ? (
+                          <span className="spots-tag full">Complet · {spots.max} places</span>
+                        ) : spots.available <= 3 ? (
+                          <span className="spots-tag low">{spots.available}/{spots.max} places</span>
+                        ) : (
+                          <span className="spots-tag available">{spots.available}/{spots.max} places</span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      className={`btn-slot-register ${isReg ? 'registered' : ''}`}
+                      disabled={isPast || (spots !== null && spots.available === 0 && !isReg)}
+                      onClick={(e) => { e.stopPropagation(); onRegisterToggle(w, d) }}
+                    >
+                      {isPast ? (
+                        <span>Terminé</span>
+                      ) : isReg ? (
+                        <><span className="reg-icon">✓</span><span className="reg-status-label">Inscrit(e)</span><span className="reg-hover-label">Désinscrire</span></>
+                      ) : spots !== null && spots.available === 0 ? (
+                        <span>Complet</span>
+                      ) : (
+                        <><span className="reg-icon">+</span><span>S'inscrire</span></>
+                      )}
+                    </button>
+                  </div>
+                )
+                })}
+                {hiddenCount > 0 && (
+                  <p className="slots-more-hint" onClick={(e) => { e.stopPropagation(); onClick() }}>
+                    +{hiddenCount} autre{hiddenCount > 1 ? 's' : ''} — voir le détail
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Workshop Detail Panel ──────────────────────────────────────
+interface DetailProps {
+  workshop: Workshop
+  registeredSlotIds: string[]
+  getSlotAvailableSpots: (s: WorkshopSession, max: number | null) => { taken: number; available: number; max: number } | null
+  onRegisterToggle: (w: Workshop, s: WorkshopSession) => void
+  onClose: () => void
+}
+
+function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots, onRegisterToggle, onClose }: DetailProps) {
+  const now = Date.now()
+  const sortedDates = [...(w.dates || [])]
+    .sort((a, b) => {
+      const aIsPast = new Date(a.endTime).getTime() < now
+      const bIsPast = new Date(b.endTime).getTime() < now
+      if (aIsPast !== bIsPast) return aIsPast ? 1 : -1
+      return new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+    })
+
+  return (
+    <div className="workshop-detail-overlay" onClick={onClose}>
+      <div className="workshop-detail-panel" onClick={(e) => e.stopPropagation()}>
+        {/* Image header */}
+        <div className="detail-image-wrap">
+          {w.image ? (
+            <img src={w.image} alt={w.title} className="detail-img" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+          ) : (
+            <div className="detail-img-placeholder"><span>🎨</span></div>
+          )}
+          <div className="detail-image-gradient" />
+          <button className="detail-close-btn" onClick={onClose} aria-label="Fermer">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+          <div className="detail-header-content">
+            {w.requiresRegistration ? (
+              <span className="badge-reg required">Inscription requise{w.maxParticipants ? ` · ${w.maxParticipants} max` : ''}</span>
+            ) : (
+              <span className="badge-reg open">Entrée libre</span>
+            )}
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="detail-body">
+          <h2 className="detail-title">{w.title}</h2>
+
+          <div className="detail-location-row">
+            <span className="detail-location-icon">📍</span>
+            <span className="detail-location-text">{w.location}</span>
+            <Link
+              to="/map"
+              search={{ places: w.location.split(' ')[0] } as any}
+              className="detail-map-link"
+              onClick={onClose}
+            >
+              Voir sur la carte →
+            </Link>
+          </div>
+
+          <p className="detail-description">{w.description}</p>
+
+          <div className="detail-slots-section">
+            <h3 className="detail-slots-title">
+              {sortedDates.length} créneau{sortedDates.length !== 1 ? 'x' : ''} disponible{sortedDates.length !== 1 ? 's' : ''}
+            </h3>
+            <div className="detail-slots-list">
+              {sortedDates.length === 0 ? (
+                <p className="no-slots-text">Aucun créneau défini</p>
+              ) : (
+                sortedDates.map((d, idx) => {
+                  const isReg = registeredSlotIds.includes(d.id)
+                  const spots = getSlotAvailableSpots(d, w.maxParticipants)
+                  const isPast = new Date(d.endTime).getTime() < Date.now()
+                  return (
+                    <div key={d.id} className={`detail-slot-card ${isReg ? 'registered' : ''} ${isPast ? 'past' : ''}`}>
+                      <div className="detail-slot-header">
+                        <span className="detail-slot-num">Créneau {idx + 1}</span>
+                        {isPast ? (
+                          <span className="spots-tag past">Terminé</span>
+                        ) : spots === null ? (
+                          <span className="spots-tag open">Entrée libre</span>
+                        ) : spots.available === 0 && !isReg ? (
+                          <span className="spots-tag full">Complet</span>
+                        ) : spots.available <= 3 ? (
+                          <span className="spots-tag low">{spots.available}/{spots.max} places</span>
+                        ) : (
+                          <span className="spots-tag available">{spots.available}/{spots.max} places</span>
+                        )}
+                      </div>
+                      <div className="detail-slot-time">{formatDateTimeRange(d.startTime, d.endTime)}</div>
+                      {w.requiresRegistration && (
+                        <button
+                          className={`detail-slot-btn ${isReg ? 'registered' : ''}`}
+                          disabled={isPast || (spots !== null && spots.available === 0 && !isReg)}
+                          onClick={() => onRegisterToggle(w, d)}
+                        >
+                          {isPast ? (
+                            <span>Créneau terminé</span>
+                          ) : isReg ? (
+                            <><span>✓ Inscrit(e)</span><span className="detail-slot-btn-hover">Annuler l'inscription</span></>
+                          ) : spots !== null && spots.available === 0 ? (
+                            <span>Complet</span>
+                          ) : (
+                            <span>+ S'inscrire à ce créneau</span>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
