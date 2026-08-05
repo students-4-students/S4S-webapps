@@ -16,7 +16,7 @@ export default function Students() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingStudent, setEditingStudent] = useState<any>(null)
-  const [createdStudentInfo, setCreatedStudentInfo] = useState<{ name: string; setupUrl: string } | null>(null)
+  const [createdStudentInfo, setCreatedStudentInfo] = useState<{ id?: string; name: string; setupUrl: string } | null>(null)
 
   // Add Form State
   const [firstName, setFirstName] = useState('')
@@ -54,6 +54,9 @@ export default function Students() {
   const updateManyMutation = trpc.students.updateMany.useMutation()
   const deleteMutation = trpc.students.delete.useMutation()
   const resetPasswordMutation = trpc.students.resetPassword.useMutation()
+  const sendWelcomeMutation = trpc.students.sendWelcome.useMutation()
+  const sendPasswordResetEmailMutation = trpc.students.sendPasswordResetEmail.useMutation()
+  const sendWelcomeToAllMutation = trpc.students.sendWelcomeToAll.useMutation()
 
   const filteredStudents = students.filter((student) => {
     const sectionNameStr = student.section?.name || ''
@@ -76,6 +79,7 @@ export default function Students() {
 
       // Set newly created student info for QR code modal
       setCreatedStudentInfo({
+        id: result.student.id,
         name: `${firstName} ${lastName}`,
         setupUrl: result.setupUrl,
       })
@@ -146,6 +150,7 @@ export default function Students() {
       const result = await resetPasswordMutation.mutateAsync({ id: editingStudent.id })
       setShowEditModal(false)
       setCreatedStudentInfo({
+        id: editingStudent.id,
         name: `${editFirstName} ${editLastName}`,
         setupUrl: result.setupUrl,
       })
@@ -156,10 +161,61 @@ export default function Students() {
     }
   }
 
+  const handleSendWelcome = async (student: any) => {
+    if (student.welcomeEmailSentAt) {
+      const firstConfirm = window.confirm(
+        `Cet étudiant (${student.firstName} ${student.lastName}) a DÉJÀ reçu l'email de bienvenue le ${new Date(
+          student.welcomeEmailSentAt
+        ).toLocaleString('fr-CH')}.\n\nVoulez-vous quand même lui renvoyer un email ?`
+      )
+      if (!firstConfirm) return
+
+      const secondConfirm = window.confirm(
+        `⚠️ CONFIRMATION SECONDAIRE :\nÊtes-vous absolument sûr(e) de vouloir renvoyer l'email de bienvenue à ${student.firstName} ${student.lastName} ?`
+      )
+      if (!secondConfirm) return
+    } else {
+      const confirmMsg = `Envoyer l'email de bienvenue à ${student.firstName} ${student.lastName} (${student.email}) ?`
+      if (!window.confirm(confirmMsg)) return
+    }
+
+    try {
+      await sendWelcomeMutation.mutateAsync({ id: student.id })
+      alert(`Email de bienvenue envoyé avec succès à ${student.email} !`)
+      utils.students.list.invalidate()
+    } catch (err: any) {
+      console.error(err)
+      alert("Erreur lors de l'envoi de l'email: " + (err.message || err))
+    }
+  }
+
+  const handleSendWelcomeToAll = async () => {
+    const pendingStudents = students.filter((s) => !s.welcomeEmailSentAt)
+    if (pendingStudents.length === 0) {
+      alert("Tous les étudiants ont déjà reçu l'email de bienvenue !")
+      return
+    }
+
+    const confirmMsg = `Envoyer l'email de bienvenue aux ${pendingStudents.length} étudiant(s) qui ne l'ont PAS encore reçu ?`
+    if (!window.confirm(confirmMsg)) return
+
+    try {
+      const res = await sendWelcomeToAllMutation.mutateAsync()
+      if (res.errors.length > 0) {
+        alert(`${res.sentCount}/${res.total} emails envoyés avec succès.\nErreurs :\n${res.errors.join('\n')}`)
+      } else {
+        alert(`Les emails de bienvenue ont été envoyés avec succès aux ${res.sentCount} étudiants !`)
+      }
+      utils.students.list.invalidate()
+    } catch (err: any) {
+      console.error(err)
+      alert("Erreur lors de l'envoi global: " + (err.message || err))
+    }
+  }
+
   const handleCsvImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-
     const reader = new FileReader()
     reader.onload = async (event) => {
       const text = event.target?.result as string
@@ -180,9 +236,7 @@ export default function Students() {
         }))
 
         await importMutation.mutateAsync(formatted)
-        alert(
-          `${formatted.length} étudiants importés avec succès ! Les liens d'invitation ont été envoyés par email.`
-        )
+        alert(`${formatted.length} étudiants importés avec succès !`)
         utils.students.list.invalidate()
       } catch (err: any) {
         console.error(err)
@@ -222,7 +276,6 @@ export default function Students() {
       })
 
       // Pass 1: floor the ideal newA per section.
-      // idealNewA[section] = (existingB - existingA + u) / 2  → sections with odd (u + existingB - existingA) have a remainder.
       type SectionSplit = { key: string; unassigned: typeof students; floorA: number; hasRemainder: boolean }
       const splits: SectionSplit[] = []
       let totalFloorA = 0
@@ -230,26 +283,24 @@ export default function Students() {
       Object.entries(bySection).forEach(([key, unassigned]) => {
         const { A: existingA, B: existingB } = existingCounts[key] || { A: 0, B: 0 }
         const u = unassigned.length
-        const raw = existingB - existingA + u          // numerator (must divide by 2)
+        const raw = existingB - existingA + u
         const floorA = Math.max(0, Math.min(u, Math.floor(raw / 2)))
-        const hasRemainder = raw % 2 !== 0             // true when ideal is x.5
+        const hasRemainder = raw % 2 !== 0
         splits.push({ key, unassigned, floorA, hasRemainder })
         totalFloorA += floorA
       })
 
       // Pass 2: decide how many of the "remainder" sections should round UP to minimise global imbalance.
-      // Global target: (totalExistingA + targetNewA) ≈ (totalExistingB + totalUnassigned - targetNewA)
-      //   => targetNewA = round((totalExistingB - totalExistingA + totalUnassigned) / 2)
       const totalUnassigned = studentsToAssign.length
       const targetNewA = Math.round((totalExistingB - totalExistingA + totalUnassigned) / 2)
-      let extraABudget = Math.max(0, targetNewA - totalFloorA)   // how many remainder sections get +1 A
+      let extraABudget = Math.max(0, targetNewA - totalFloorA)
 
       const updatedStudents: { id: string; firstDayGroup: 'A' | 'B' }[] = []
 
       splits.forEach(({ unassigned, floorA, hasRemainder }) => {
         let newACount = floorA
         if (hasRemainder && extraABudget > 0) {
-          newACount++   // round up this section
+          newACount++
           extraABudget--
         }
         unassigned.forEach((student, i) => {
@@ -274,7 +325,7 @@ export default function Students() {
     <div className="students-page">
       <PageHeader
         actions={
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <Button variant="primary" onClick={() => setShowAddModal(true)}>
               + Nouvel Étudiant
             </Button>
@@ -290,13 +341,18 @@ export default function Students() {
               />
             </label>
             <Button variant="secondary" onClick={() => setGroupForAllStudents()}>
-              Définir le groupe du premier jour pour tous les étudiants
+              Définir les groupes du 1er jour
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleSendWelcomeToAll}
+              isLoading={sendWelcomeToAllMutation.isPending}
+            >
+              ✉️ Envoyer l'email à tous
             </Button>
           </div>
         }
       />
-
-      
 
       <div className="table-card">
         {isLoading ? (
@@ -321,6 +377,7 @@ export default function Students() {
                   <th>Email</th>
                   <th>Section</th>
                   <th>Groupe</th>
+                  <th>Email envoyé</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -334,11 +391,50 @@ export default function Students() {
                       <td>{student.section?.name || '—'}</td>
                       <td>{student.firstDayGroup || '—'}</td>
                       <td>
+                        {student.welcomeEmailSentAt ? (
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              padding: '2px 8px',
+                              borderRadius: '12px',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              background: '#dcfce7',
+                              color: '#15803d',
+                            }}
+                            title={`Envoyé le ${new Date(student.welcomeEmailSentAt).toLocaleString('fr-CH')}`}
+                          >
+                            ✓ Envoyé
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              padding: '2px 8px',
+                              borderRadius: '12px',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              background: '#f1f5f9',
+                              color: '#64748b',
+                            }}
+                          >
+                            Non envoyé
+                          </span>
+                        )}
+                      </td>
+                      <td>
                         <div className="action-buttons">
-                          <button className="btn-icon" onClick={() => handleEditClick(student)}>
+                          <button
+                            className="btn-icon"
+                            title="Envoyer l'email de bienvenue"
+                            onClick={() => handleSendWelcome(student)}
+                          >
+                            ✉️
+                          </button>
+                          <button className="btn-icon" title="Modifier" onClick={() => handleEditClick(student)}>
                             ✏️
                           </button>
-                          <button className="btn-icon delete" onClick={() => handleDelete(student.id)}>
+                          <button className="btn-icon delete" title="Supprimer" onClick={() => handleDelete(student.id)}>
                             🗑️
                           </button>
                         </div>
@@ -347,7 +443,7 @@ export default function Students() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', color: 'var(--s4s-text-muted)', padding: '2rem' }}>
+                    <td colSpan={7} style={{ textAlign: 'center', color: 'var(--s4s-text-muted)', padding: '2rem' }}>
                       Aucun étudiant trouvé.
                     </td>
                   </tr>
@@ -608,9 +704,30 @@ export default function Students() {
               </Button>
             </div>
 
-            <Button variant="primary" style={{ width: '100%' }} onClick={() => setCreatedStudentInfo(null)}>
-              Terminer
-            </Button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {createdStudentInfo.id && (
+                <Button
+                  variant="secondary"
+                  style={{ flex: 1 }}
+                  isLoading={sendPasswordResetEmailMutation.isPending}
+                  onClick={async () => {
+                    try {
+                      await sendPasswordResetEmailMutation.mutateAsync({ id: createdStudentInfo.id! })
+                      alert(`Email de réinitialisation envoyé avec succès à ${createdStudentInfo.name} !`)
+                      utils.students.list.invalidate()
+                    } catch (err: any) {
+                      console.error(err)
+                      alert("Erreur lors de l'envoi de l'email: " + (err.message || err))
+                    }
+                  }}
+                >
+                  ✉️ Envoyer l'email de réinitialisation
+                </Button>
+              )}
+              <Button variant="primary" style={{ flex: 1 }} onClick={() => setCreatedStudentInfo(null)}>
+                Terminer
+              </Button>
+            </div>
           </div>
         </Modal>
       )}

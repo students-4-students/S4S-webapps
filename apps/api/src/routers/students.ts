@@ -5,6 +5,7 @@ import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { TRPCError } from '@trpc/server'
+import { sendPasswordReset, sendWelcomeEmail } from '../lib/mailer'
 
 export const studentsEmitter = new EventEmitter()
 studentsEmitter.setMaxListeners(100)
@@ -76,14 +77,13 @@ export const studentsRouter = router({
         },
       })
 
-      // Generate a setup token valid for 24h
+      // Generate a setup token (no time expiration)
       const token = jwt.sign(
         { userId: student.id, email: student.email, action: 'setup-password' },
-        process.env.JWT_SECRET!,
-        { expiresIn: '24h' }
+        process.env.JWT_SECRET!
       )
 
-      console.log(`\n========================================================================\n[STUDENT INVITE] Setup password link for ${student.firstName} ${student.lastName} (${student.email}):\nhttp://localhost:5173/setup-password?token=${token}\n========================================================================\n`)
+      console.log(`\n========================================================================\n[STUDENT CREATED] Setup password link for ${student.firstName} ${student.lastName} (${student.email}):\nhttp://localhost:5173/setup-password?token=${token}\n========================================================================\n`)
 
       studentsEmitter.emit('updated')
       return {
@@ -176,15 +176,13 @@ export const studentsRouter = router({
           },
         })
 
-        // Generate a setup token valid for 24h
+        // Generate a setup token (no time expiration)
         const token = jwt.sign(
           { userId: student.id, email: student.email, action: 'setup-password' },
-          process.env.JWT_SECRET!,
-          { expiresIn: '24h' }
+          process.env.JWT_SECRET!
         )
 
-        //TODO: send email
-        console.log(`[STUDENT INVITE] Setup password link for ${student.firstName} ${student.lastName} (${student.email}): http://localhost:5173/setup-password?token=${token}`)
+        console.log(`[STUDENT CREATED] Setup password link for ${student.firstName} ${student.lastName} (${student.email}): http://localhost:5173/setup-password?token=${token}`)
         
         createdStudents.push(student)
       }
@@ -228,23 +226,123 @@ export const studentsRouter = router({
 
       await ctx.db.user.update({
         where: { id: student.id },
-        data: { password: hashedPassword }
+        data: { password: hashedPassword, passwordConfigured: false }
       })
 
-      // Generate a setup token valid for 24h
+      // Generate a setup token (no time expiration)
       const token = jwt.sign(
         { userId: student.id, email: student.email, action: 'setup-password' },
-        process.env.JWT_SECRET!,
-        { expiresIn: '24h' }
+        process.env.JWT_SECRET!
       )
 
       console.log(`\n========================================================================\n[PASSWORD RESET] Setup password link for ${student.firstName} ${student.lastName} (${student.email}):\nhttp://localhost:5173/setup-password?token=${token}\n========================================================================\n`)
 
       studentsEmitter.emit('updated')
       return {
+        studentId: student.id,
         setupUrl: `http://localhost:5173/setup-password?token=${token}`
       }
     }),
+
+  sendPasswordResetEmail: staffProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const student = await ctx.db.user.findUniqueOrThrow({
+        where: { id: input.id, role: 'PARTICIPANT' }
+      })
+
+      const token = jwt.sign(
+        { userId: student.id, email: student.email, action: 'setup-password' },
+        process.env.JWT_SECRET!
+      )
+      const setupUrl = `http://localhost:5173/setup-password?token=${token}`
+
+      await sendPasswordReset({
+        email: student.email,
+        firstName: student.firstName,
+        lastName: student.lastName,
+        setupUrl,
+      })
+
+      return { success: true }
+    }),
+
+  sendWelcome: staffProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const student = await ctx.db.user.findUniqueOrThrow({
+        where: { id: input.id, role: 'PARTICIPANT' },
+        include: { section: true },
+      })
+
+      // Generate a setup token (no time expiration)
+      const token = jwt.sign(
+        { userId: student.id, email: student.email, action: 'setup-password' },
+        process.env.JWT_SECRET!
+      )
+      const setupUrl = `http://localhost:5173/setup-password?token=${token}`
+
+      await sendWelcomeEmail({
+        studentId: student.id,
+        email: student.email,
+        firstName: student.firstName,
+        lastName: student.lastName,
+        sectionName: student.section?.name,
+        firstDayGroup: student.firstDayGroup,
+        setupUrl,
+      })
+
+      await ctx.db.user.update({
+        where: { id: student.id },
+        data: { welcomeEmailSentAt: new Date() },
+      })
+
+      studentsEmitter.emit('updated')
+      return { success: true }
+    }),
+
+  sendWelcomeToAll: staffProcedure.mutation(async ({ ctx }) => {
+    const students = await ctx.db.user.findMany({
+      where: { role: 'PARTICIPANT', welcomeEmailSentAt: null },
+      include: { section: true },
+    })
+
+    let sentCount = 0
+    const errors: string[] = []
+
+    for (const student of students) {
+      try {
+        const token = jwt.sign(
+          { userId: student.id, email: student.email, action: 'setup-password' },
+          process.env.JWT_SECRET!
+        )
+        const setupUrl = `http://localhost:5173/setup-password?token=${token}`
+
+        await sendWelcomeEmail({
+          studentId: student.id,
+          email: student.email,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          sectionName: student.section?.name,
+          firstDayGroup: student.firstDayGroup,
+          setupUrl,
+        })
+
+        await ctx.db.user.update({
+          where: { id: student.id },
+          data: { welcomeEmailSentAt: new Date() },
+        })
+
+        sentCount++
+      } catch (err: any) {
+        console.error(`[MAILER] Failed to send welcome email to ${student.email}:`, err)
+        errors.push(`${student.email}: ${err?.message || err}`)
+      }
+    }
+
+    studentsEmitter.emit('updated')
+    return { sentCount, total: students.length, errors }
+  }),
 
   setupPassword: publicProcedure
     .input(
@@ -264,17 +362,36 @@ export const studentsRouter = router({
           throw new TRPCError({ code: 'BAD_REQUEST', message: 'Action non autorisée' })
         }
 
+        const student = await ctx.db.user.findUnique({
+          where: { id: decoded.userId }
+        })
+
+        if (!student) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Utilisateur non trouvé' })
+        }
+
+        if (student.passwordConfigured) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Ce lien de configuration a déjà été utilisé.',
+          })
+        }
+
         const hashedPassword = await bcrypt.hash(input.password, 10)
         await ctx.db.user.update({
           where: { id: decoded.userId },
-          data: { password: hashedPassword },
+          data: {
+            password: hashedPassword,
+            passwordConfigured: true,
+          },
         })
 
         return { success: true }
       } catch (err: any) {
+        if (err instanceof TRPCError) throw err
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'Le lien d\'invitation est invalide ou a expiré.',
+          message: 'Le lien d\'invitation est invalide.',
         })
       }
     }),

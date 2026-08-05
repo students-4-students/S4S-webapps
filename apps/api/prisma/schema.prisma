@@ -26,6 +26,8 @@ model User {
   workshopRegistrations WorkshopRegistration[]
   firstDayGroup         String?
   QRScannedAt           DateTime?
+  welcomeEmailSentAt    DateTime?
+  passwordConfigured    Boolean                @default(false)
 }
 
 model Section {
