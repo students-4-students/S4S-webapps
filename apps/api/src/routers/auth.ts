@@ -48,6 +48,7 @@ export const authRouter = router({
         lastName: true,
         role: true,
         sectionId: true,
+        firstDayGroup: true,
       },
     })
 
