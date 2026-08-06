@@ -1,0 +1,165 @@
+/* Feedback & Polls Page Styling - Rich Glassmorphic Theme */
+
+.feedback-page {
+  padding: 1.25rem 2rem 2rem 2rem;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-height: 100%;
+}
+
+.feedback-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.feedback-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1.5rem;
+}
+
+.survey-card {
+  background: rgba(35, 27, 52, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(238, 212, 241, 0.2);
+  border-radius: 16px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.survey-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(238, 212, 241, 0.45);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+}
+
+.survey-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.survey-badge.active {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.survey-badge.inactive {
+  background: rgba(148, 163, 184, 0.2);
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+/* Likert scale styling */
+.likert-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.likert-options {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.5rem;
+}
+
+.likert-btn {
+  padding: 0.65rem 0.25rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  font-size: 0.8rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.likert-btn:hover {
+  background: rgba(238, 212, 241, 0.2);
+  border-color: rgba(238, 212, 241, 0.5);
+}
+
+.likert-btn.selected {
+  background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
+  border-color: transparent;
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(236, 72, 153, 0.35);
+}
+
+/* Builder Modal Styles */
+.builder-page-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(238, 212, 241, 0.25);
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.builder-question-card {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-top: 0.75rem;
+}
+
+/* Analytics charts and progress bars */
+.analytics-bar-bg {
+  width: 100%;
+  height: 22px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 11px;
+  overflow: hidden;
+  position: relative;
+}
+
+.analytics-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #818cf8 0%, #f472b6 100%);
+  border-radius: 11px;
+  transition: width 0.4s ease;
+}
+
+.analytics-text-list {
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.analytics-text-item {
+  background: rgba(255, 255, 255, 0.06);
+  border-left: 3px solid #f472b6;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0 8px 8px 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}

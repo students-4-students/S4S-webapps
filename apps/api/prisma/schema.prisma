@@ -28,6 +28,7 @@ model User {
   QRScannedAt           DateTime?
   welcomeEmailSentAt    DateTime?
   passwordConfigured    Boolean                @default(false)
+  surveyResponses       SurveyResponse[]
 }
 
 model Section {
@@ -160,6 +161,81 @@ model PollResponse {
   user     User       @relation(fields: [userId], references: [id])
 
   @@unique([userId, pollId])
+}
+
+// ─── FEEDBACK / SURVEYS ────────────────────────────────────────────────────────
+
+enum QuestionType {
+  LIKERT_5      // "Tout à fait d'accord, D'accord, pas d'accord, Pas du tout d'accord, sans avis"
+  OPEN_TEXT     // Texarea open text answer
+  SINGLE_CHOICE // Single choice option
+  MULTIPLE      // Multiple choices option (checkboxes)
+}
+
+model Survey {
+  id          String           @id @default(uuid())
+  title       String
+  description String?
+  active      Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  pages       SurveyPage[]
+  responses   SurveyResponse[]
+}
+
+model SurveyPage {
+  id          String           @id @default(uuid())
+  surveyId    String
+  survey      Survey           @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  order       Int              @default(0)
+  questions   SurveyQuestion[]
+}
+
+model SurveyQuestion {
+  id          String         @id @default(uuid())
+  pageId      String
+  page        SurveyPage     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  type        QuestionType
+  required    Boolean        @default(true)
+  order       Int            @default(0)
+  options     SurveyOption[]
+  answers     SurveyAnswer[]
+}
+
+model SurveyOption {
+  id         String         @id @default(uuid())
+  questionId String
+  question   SurveyQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  label      String
+  order      Int            @default(0)
+  answers    SurveyAnswer[]
+}
+
+model SurveyResponse {
+  id        String         @id @default(uuid())
+  surveyId  String
+  survey    Survey         @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime       @default(now())
+  answers   SurveyAnswer[]
+
+  @@unique([surveyId, userId])
+}
+
+model SurveyAnswer {
+  id          String         @id @default(uuid())
+  responseId  String
+  response    SurveyResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  questionId  String
+  question    SurveyQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  optionId    String?        
+  option      SurveyOption?  @relation(fields: [optionId], references: [id], onDelete: SetNull)
+  textAnswer  String?        
 }
 
 model File {

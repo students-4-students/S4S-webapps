@@ -8,6 +8,7 @@ const ROUTE_TITLES: Record<string, string> = {
   '/students': 'Étudiants',
   '/workshops': 'Workshops',
   '/incidents': 'Incidents',
+  '/feedback': 'Sondages & Feedback',
   '/scan': '📷 Scanner QR',
 }
 
