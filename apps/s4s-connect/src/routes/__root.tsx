@@ -61,7 +61,7 @@ function RootLayout() {
         </header>
 
         {/* Main Content Area */}
-        <main className="app-main">
+        <main className={`app-main ${location.pathname === '/drive' ? 'app-main--full-width' : ''}`}>
           <Outlet />
         </main>
 

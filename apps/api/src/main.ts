@@ -22,6 +22,15 @@ const server = Bun.serve({
       return new Response(null, { status: 204, headers: CORS_HEADERS })
     }
 
+    if (url.pathname.startsWith('/uploads/')) {
+      const filePath = `${process.cwd()}${url.pathname}`
+      const file = Bun.file(filePath)
+      if (await file.exists()) {
+        return new Response(file, { headers: CORS_HEADERS })
+      }
+      return new Response('File not found', { status: 404, headers: CORS_HEADERS })
+    }
+
     if (url.pathname.startsWith('/trpc')) {
       const response = await fetchRequestHandler({
         endpoint: '/trpc',
