@@ -8,6 +8,7 @@ import { workshopsRouter } from './workshops'
 import { tasksRouter } from './tasks'
 import { shiftsRouter } from './shifts'
 import { scanRouter } from './scan'
+import { driveRouter } from './drive'
 import { feedbackRouter } from './feedback'
 
 export const appRouter = router({
@@ -20,6 +21,7 @@ export const appRouter = router({
   tasks: tasksRouter,
   shifts: shiftsRouter,
   scan: scanRouter,
+  drive: driveRouter,
   feedback: feedbackRouter,
 })
 

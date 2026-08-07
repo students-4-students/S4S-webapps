@@ -12,7 +12,7 @@ const server = Bun.serve({
     const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0]
 
     const CORS_HEADERS = {
-      'Access-Control-Allow-Origin': allowedOrigin,
+      'Access-Control-Allow-Origin': origin || allowedOrigin,
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Allow-Credentials': 'true',
@@ -20,6 +20,15 @@ const server = Bun.serve({
 
     if (req.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: CORS_HEADERS })
+    }
+
+    if (url.pathname.startsWith('/uploads/')) {
+      const filePath = `${process.cwd()}${url.pathname}`
+      const file = Bun.file(filePath)
+      if (await file.exists()) {
+        return new Response(file, { headers: CORS_HEADERS })
+      }
+      return new Response('File not found', { status: 404, headers: CORS_HEADERS })
     }
 
     if (url.pathname.startsWith('/trpc')) {

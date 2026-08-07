@@ -1,3 +1,5 @@
+@import '@s4s/ui/styles.css';
+
 /* ========================================== */
 /* s4s-connect Theme variables (Match gest4s) */
 /* ========================================== */
@@ -257,6 +259,13 @@ body {
   max-width: 600px;
   margin: 0 auto;
   width: 100%;
+}
+
+.app-main--full-width {
+  max-width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
 }
 
 /* Bottom Navigation (Matches gest4s purple theme) */
@@ -2939,4 +2948,45 @@ body:has(.map-page-container) .app-main {
   text-transform: uppercase;
   color: #ff99cc;
   letter-spacing: 0.05em;
+}
+
+/* ── Favorites styling ──────────────────────── */
+.font-rose {
+  color: #ff66b3 !important;
+}
+
+.workshop-fav-btn, .detail-fav-btn {
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  color: white;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition: transform 0.2s, background-color 0.2s;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  font-size: 1rem;
+}
+
+.workshop-fav-btn:hover, .detail-fav-btn:hover {
+  transform: scale(1.1);
+  background: rgba(255, 102, 179, 0.3);
+}
+
+.workshop-fav-btn {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  z-index: 10;
+}
+
+.detail-fav-btn {
+  position: absolute;
+  top: 0.85rem;
+  right: 3.5rem;
+  z-index: 10;
 }

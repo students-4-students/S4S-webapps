@@ -80,6 +80,8 @@ model StaffMember {
   Class_AssistantClasses Class[]          @relation("AssistantClasses")
   Class_RcClasses        Class[]          @relation("RcClasses")
   Class_SpeakerClasses   Class[]          @relation("SpeakerClasses")
+  readWriteClasses       Class[]          @relation("ClassReadWriteStaff")
+  readOnlyClasses        Class[]          @relation("ClassReadOnlyStaff")
 }
 
 model Shift {
@@ -263,15 +265,22 @@ model Class {
   Section                      Section[]
   StaffMember_RcClasses        StaffMember[] @relation("RcClasses")
   StaffMember_SpeakerClasses   StaffMember[] @relation("SpeakerClasses")
+  
+  // Custom access permissions for Staff
+  readWriteStaff               StaffMember[] @relation("ClassReadWriteStaff")
+  readOnlyStaff                StaffMember[] @relation("ClassReadOnlyStaff")
 }
 
 model Folder {
-  id        String   @id
+  id        String   @id @default(uuid())
   name      String
   createdAt DateTime @default(now())
   classId   String
+  parentId  String?
   File      File[]
   Class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  parent    Folder?  @relation("FolderToFolder", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Folder[] @relation("FolderToFolder")
 }
 
 enum Role {

@@ -142,7 +142,7 @@ export async function sendWelcomeEmail({
   email,
   firstName,
   lastName,
-  sectionName,
+  sectionName: _sectionName,
   firstDayGroup,
   setupUrl,
 }: {

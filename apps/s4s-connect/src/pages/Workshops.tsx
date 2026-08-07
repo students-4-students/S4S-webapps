@@ -35,13 +35,31 @@ import { formatDateTimeRange } from '@s4s/ui'
 
 export default function Workshops() {
   const [searchQuery, setSearchQuery] = useState('')
-  const [registrationFilter, setRegistrationFilter] = useState<'all' | 'required' | 'open'>('all')
+  const [registrationFilter, setRegistrationFilter] = useState<'all' | 'required' | 'open' | 'favorites'>('all')
   const [timeFilter, setTimeFilter] = useState<'all' | 'upcoming' | 'past'>('all')
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [selectedWorkshop, setSelectedWorkshop] = useState<Workshop | null>(null)
 
   const utils = trpc.useUtils()
   const user = useAuthStore((state) => state.user)
+
+  // Track favorited workshop IDs in local state / localStorage
+  const [favoriteIds, setFavoriteIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('s4s_favorite_workshops')
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('s4s_favorite_workshops', JSON.stringify(favoriteIds))
+    } catch (err) {
+      console.error('Failed to save favorites:', err)
+    }
+  }, [favoriteIds])
 
   // Track registered slots in local state / localStorage
   const [registeredSlotIds, setRegisteredSlotIds] = useState<string[]>(() => {
@@ -121,7 +139,7 @@ export default function Workshops() {
   const unregisterMutation = trpc.workshops.unregister.useMutation({
     onSuccess: () => { utils.workshops.list.invalidate() },
     onError: (err) => {
-      setToastMessage(err.message || 'Erreur lors de la désinscription')
+      setToastMessage(err.message || 'Erreur lors de la désincription')
       setTimeout(() => setToastMessage(null), 3500)
     },
   })
@@ -157,6 +175,24 @@ export default function Workshops() {
     setTimeout(() => setToastMessage(null), 3500)
   }
 
+  const toggleFavorite = (workshopId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation()
+    }
+    setFavoriteIds((prev) => {
+      const isFav = prev.includes(workshopId)
+      if (isFav) {
+        setToastMessage('Retiré des favoris')
+        setTimeout(() => setToastMessage(null), 2500)
+        return prev.filter((id) => id !== workshopId)
+      } else {
+        setToastMessage('Ajouté aux favoris ❤️')
+        setTimeout(() => setToastMessage(null), 2500)
+        return [...prev, workshopId]
+      }
+    })
+  }
+
   // Filtered workshops
   const filteredWorkshops = useMemo(() => {
     const now = new Date().getTime()
@@ -166,10 +202,16 @@ export default function Workshops() {
         w.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         w.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
         w.description.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesReg =
-        registrationFilter === 'all' ||
-        (registrationFilter === 'required' && w.requiresRegistration) ||
-        (registrationFilter === 'open' && !w.requiresRegistration)
+      
+      let matchesReg = true
+      if (registrationFilter === 'required') {
+        matchesReg = w.requiresRegistration
+      } else if (registrationFilter === 'open') {
+        matchesReg = !w.requiresRegistration
+      } else if (registrationFilter === 'favorites') {
+        matchesReg = favoriteIds.includes(w.id)
+      }
+
       let matchesTime = true
       if (timeFilter !== 'all') {
         const hasUpcoming = w.dates.some((d) => new Date(d.endTime).getTime() > now)
@@ -177,7 +219,7 @@ export default function Workshops() {
       }
       return matchesSearch && matchesReg && matchesTime
     })
-  }, [workshops, searchQuery, registrationFilter, timeFilter])
+  }, [workshops, searchQuery, registrationFilter, timeFilter, favoriteIds])
 
   const hasActiveFilters = searchQuery !== '' || registrationFilter !== 'all' || timeFilter !== 'all'
   const resetFilters = () => { setSearchQuery(''); setRegistrationFilter('all'); setTimeFilter('all') }
@@ -253,6 +295,8 @@ export default function Workshops() {
           getSlotAvailableSpots={getSlotAvailableSpots}
           onRegisterToggle={handleSlotRegisterToggle}
           onClose={closeDetail}
+          favoriteIds={favoriteIds}
+          onFavoriteToggle={toggleFavorite}
         />
       )}
 
@@ -287,6 +331,7 @@ export default function Workshops() {
           <button className={`filter-chip ${registrationFilter === 'all' ? 'active' : ''}`} onClick={() => setRegistrationFilter('all')}>Tous</button>
           <button className={`filter-chip ${registrationFilter === 'open' ? 'active' : ''}`} onClick={() => setRegistrationFilter('open')}>Entrée libre</button>
           <button className={`filter-chip ${registrationFilter === 'required' ? 'active' : ''}`} onClick={() => setRegistrationFilter('required')}>Inscription</button>
+          <button className={`filter-chip ${registrationFilter === 'favorites' ? 'active font-rose' : ''}`} onClick={() => setRegistrationFilter('favorites')}>❤️ Favoris</button>
           <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value as any)} className="filter-select-connect" style={{ flex: 'none', minWidth: '0', width: 'auto' }}>
             <option value="all">Toutes les sessions</option>
             <option value="upcoming">À venir</option>
@@ -331,6 +376,8 @@ export default function Workshops() {
                     getSlotAvailableSpots={getSlotAvailableSpots}
                     onRegisterToggle={handleSlotRegisterToggle}
                     onClick={() => setSelectedWorkshop(w)}
+                    isFavorite={favoriteIds.includes(w.id)}
+                    onFavoriteToggle={(e) => toggleFavorite(w.id, e)}
                   />
                 ))}
               </div>
@@ -355,6 +402,8 @@ export default function Workshops() {
                     getSlotAvailableSpots={getSlotAvailableSpots}
                     onRegisterToggle={handleSlotRegisterToggle}
                     onClick={() => setSelectedWorkshop(w)}
+                    isFavorite={favoriteIds.includes(w.id)}
+                    onFavoriteToggle={(e) => toggleFavorite(w.id, e)}
                   />
                 ))}
               </div>
@@ -373,9 +422,11 @@ interface CardProps {
   getSlotAvailableSpots: (s: WorkshopSession, max: number | null) => { taken: number; available: number; max: number } | null
   onRegisterToggle: (w: Workshop, s: WorkshopSession) => void
   onClick: () => void
+  isFavorite: boolean
+  onFavoriteToggle: (e: React.MouseEvent) => void
 }
 
-function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, onRegisterToggle, onClick }: CardProps) {
+function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, onRegisterToggle, onClick, isFavorite, onFavoriteToggle }: CardProps) {
   const now = Date.now()
   const sortedDates = [...(w.dates || [])]
     .sort((a, b) => {
@@ -401,6 +452,10 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
           ) : (
             <span className="badge-reg open">Entrée libre</span>
           )}
+          {/* Favorite button absolute over image */}
+          <button className={`workshop-fav-btn ${isFavorite ? 'active' : ''}`} onClick={onFavoriteToggle} aria-label="Ajouter aux favoris">
+            {isFavorite ? '❤️' : '🤍'}
+          </button>
         </div>
       </div>
 
@@ -483,9 +538,11 @@ interface DetailProps {
   getSlotAvailableSpots: (s: WorkshopSession, max: number | null) => { taken: number; available: number; max: number } | null
   onRegisterToggle: (w: Workshop, s: WorkshopSession) => void
   onClose: () => void
+  favoriteIds: string[]
+  onFavoriteToggle: (id: string, e?: React.MouseEvent) => void
 }
 
-function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots, onRegisterToggle, onClose }: DetailProps) {
+function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots, onRegisterToggle, onClose, favoriteIds, onFavoriteToggle }: DetailProps) {
   const now = Date.now()
   const sortedDates = [...(w.dates || [])]
     .sort((a, b) => {
@@ -494,6 +551,8 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
       if (aIsPast !== bIsPast) return aIsPast ? 1 : -1
       return new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
     })
+
+  const isFavorite = favoriteIds.includes(w.id)
 
   return (
     <div className="workshop-detail-overlay" onClick={onClose}>
@@ -511,6 +570,12 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
+          
+          {/* Favorite button absolute over detail image */}
+          <button className={`detail-fav-btn ${isFavorite ? 'active' : ''}`} onClick={(e) => onFavoriteToggle(w.id, e)} aria-label="Ajouter aux favoris">
+            {isFavorite ? '❤️' : '🤍'}
+          </button>
+
           <div className="detail-header-content">
             {w.requiresRegistration ? (
               <span className="badge-reg required">Inscription requise{w.maxParticipants ? ` · ${w.maxParticipants} max` : ''}</span>
@@ -571,7 +636,7 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
                       {w.requiresRegistration && (
                         <button
                           className={`detail-slot-btn ${isReg ? 'registered' : ''}`}
-                          disabled={isPast || (spots !== null && spots.available === 0 && !isReg)}
+                          disabled={spots !== null && spots.available === 0 && !isReg}
                           onClick={() => onRegisterToggle(w, d)}
                         >
                           {isPast ? (
