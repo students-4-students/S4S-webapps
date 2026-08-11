@@ -47,7 +47,7 @@ s4s-apps/
 │           ├── pages/
 │           └── store/
 ├── infra/
-│   ├── docker-compose.dev.yml  # Local services (Postgres, Valkey, MinIO)
+│   ├── docker-compose.dev.yml  # Local services (Postgres)
 │   └── .env.example
 └── packages/
     └── types/                # Shared types & Zod schemas
@@ -69,7 +69,7 @@ bun install
 ### 2. Configure environment variables
 
 ```bash
-# Infrastructure (Postgres, MinIO credentials)
+# Infrastructure (Postgres credentials)
 cp infra/.env.example infra/.env
 
 # API
@@ -79,8 +79,6 @@ cp apps/api/.env.example apps/api/.env
 Fill in the required values:
 
 - `JWT_SECRET` — required; generate one with `openssl rand -hex 32`
-- `MINIO_SECRET_KEY` — required; choose any password for the local MinIO instance
-- `POSTGRES_PASSWORD` — optional; defaults to `localdev`, change if needed (keep in sync between both files)
 
 ### 3. Start infrastructure services
 
@@ -88,7 +86,7 @@ Fill in the required values:
 bun run infra:up
 ```
 
-This starts PostgreSQL (PostGIS), Valkey, and MinIO via Docker.
+This starts PostgreSQL (PostGIS) via Docker.
 
 ### 4. Run database migrations and seed
 
@@ -124,7 +122,6 @@ This starts the API, gest4s, and s4s-connect in parallel.
 | API | http://localhost:3000 |
 | gest4s (frontend) | http://localhost:5173 |
 | s4s-connect (frontend) | http://localhost:5174 |
-| MinIO console | http://localhost:9001 |
 
 ## Common commands
 

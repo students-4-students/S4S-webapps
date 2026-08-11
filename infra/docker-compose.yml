@@ -28,36 +28,4 @@ services:
       - "3001:3001"   # → point your subdomain proxy at this port
     environment:
       DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: redis://valkey:6379
       JWT_SECRET: ${JWT_SECRET}
-      MINIO_ENDPOINT: minio
-      MINIO_PORT: 9000
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
-    depends_on:
-      - valkey
-      - minio
-
-  # ── Cache + pub/sub ───────────────────────────────────
-  valkey:
-    image: valkey/valkey:7-alpine
-    restart: unless-stopped
-    volumes:
-      - valkey_data:/data
-
-  # ── Object storage ────────────────────────────────────
-  minio:
-    image: minio/minio:latest
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
-    ports:
-      - "9001:9001"   # MinIO web console (optional, can be closed after setup)
-    volumes:
-      - minio_data:/data
-
-volumes:
-  valkey_data:
-  minio_data:
