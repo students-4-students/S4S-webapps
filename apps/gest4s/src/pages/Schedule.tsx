@@ -30,7 +30,7 @@ const SECTIONS = [
   'GC',
   'IN',
   'MA',
-  'ME',
+  'GM',
   'MT',
   'MX',
   'PH',
@@ -148,6 +148,86 @@ function Schedule() {
       top: `${top}px`,
       height: `${Math.max(38, height)}px`, // minimum height of 38px to keep cards legible
     }
+  }
+
+  // Compute side-by-side positioning (left, width) for overlapping slots in a day column
+  const computeOverlappingLayout = (daySlots: any[]) => {
+    if (!daySlots || daySlots.length === 0) return new Map<string, { left: string; width: string }>()
+
+    const parsed = daySlots.map((slot) => {
+      const s = typeof slot.startTime === 'string' ? new Date(slot.startTime) : slot.startTime
+      const e = typeof slot.endTime === 'string' ? new Date(slot.endTime) : slot.endTime
+      return {
+        id: slot.id,
+        startMin: s.getHours() * 60 + s.getMinutes(),
+        endMin: e.getHours() * 60 + e.getMinutes(),
+      }
+    })
+
+    // Group into connected components of overlapping slots
+    const clusters: typeof parsed[] = []
+    let currentCluster: typeof parsed = []
+    let clusterEnd = -1
+
+    // Sort by start time
+    const sorted = [...parsed].sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin)
+
+    for (const item of sorted) {
+      if (currentCluster.length === 0) {
+        currentCluster.push(item)
+        clusterEnd = item.endMin
+      } else if (item.startMin < clusterEnd) {
+        currentCluster.push(item)
+        if (item.endMin > clusterEnd) {
+          clusterEnd = item.endMin
+        }
+      } else {
+        clusters.push(currentCluster)
+        currentCluster = [item]
+        clusterEnd = item.endMin
+      }
+    }
+    if (currentCluster.length > 0) {
+      clusters.push(currentCluster)
+    }
+
+    const layoutMap = new Map<string, { left: string; width: string }>()
+
+    for (const cluster of clusters) {
+      // Assign columns using greedy coloring algorithm
+      const columns: (typeof parsed)[] = []
+      const itemCol = new Map<string, number>()
+
+      for (const item of cluster) {
+        let placed = false
+        for (let colIdx = 0; colIdx < columns.length; colIdx++) {
+          const lastInCol = columns[colIdx][columns[colIdx].length - 1]
+          if (lastInCol.endMin <= item.startMin) {
+            columns[colIdx].push(item)
+            itemCol.set(item.id, colIdx)
+            placed = true
+            break
+          }
+        }
+        if (!placed) {
+          columns.push([item])
+          itemCol.set(item.id, columns.length - 1)
+        }
+      }
+
+      const totalCols = columns.length
+      for (const item of cluster) {
+        const colIdx = itemCol.get(item.id) || 0
+        const widthPct = (100 / totalCols).toFixed(2)
+        const leftPct = ((colIdx * 100) / totalCols).toFixed(2)
+        layoutMap.set(item.id, {
+          left: `calc(${leftPct}% + ${colIdx > 0 ? 2 : 0}px)`,
+          width: `calc(${widthPct}% - 4px)`,
+        })
+      }
+    }
+
+    return layoutMap
   }
 
   if (loadingSlots || loadingStaffs) {
@@ -457,6 +537,7 @@ function Schedule() {
           {/* Day Columns (Contain background cells and absolute slots) */}
           {DAYS.map((day) => {
             const daySlots = getSlotsForDay(day.dateStr)
+            const layoutMap = computeOverlappingLayout(daySlots)
             return (
               <div className="day-body-column" key={day.dateStr}>
                 {/* Background Hour Lines */}
@@ -468,11 +549,15 @@ function Schedule() {
                 <div className="cards-container">
                   {daySlots.map((slot) => {
                     const cardStyle = calculateCardStyle(slot.startTime, slot.endTime)
+                    const sideStyle = layoutMap.get(slot.id)
+                    const combinedStyle = sideStyle
+                      ? { ...cardStyle, left: sideStyle.left, width: sideStyle.width, right: 'auto' }
+                      : cardStyle
                     return (
                       <AbsoluteSlotCard
                         key={slot.id}
                         slot={slot}
-                        style={cardStyle}
+                        style={combinedStyle}
                         formatTime={formatTime}
                         onClick={() => {
                           if (slot.isShift) {

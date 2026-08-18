@@ -47,6 +47,7 @@ model ScheduleSlot {
   endTime     DateTime
   location    String?
   sectionId   String?
+  targetGroup String?      // null = all students, 'A' = Groupe A, 'B' = Groupe B
   type        ScheduleType
   assistantId String?
   speakerId   String?

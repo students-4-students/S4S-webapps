@@ -64,11 +64,6 @@ export default function Drive() {
     },
   })
 
-  const handleClassSelect = (classId: string) => {
-    setSelectedClassId(classId)
-    setCurrentFolderId(null)
-    setFolderPath([])
-  }
 
   const handleFolderClick = (folder: any) => {
     setCurrentFolderId(folder.id)
@@ -182,6 +177,22 @@ export default function Drive() {
     return `${(bytes / 1048576).toFixed(1)} MB`
   }
 
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
+
+  // Auto-select first class when classes are loaded
+  React.useEffect(() => {
+    if (classes.length > 0 && !selectedClassId) {
+      setSelectedClassId(classes[0].id)
+    }
+  }, [classes, selectedClassId])
+
+  const handleClassSelect = (classId: string) => {
+    setSelectedClassId(classId)
+    setCurrentFolderId(null)
+    setFolderPath([])
+    setIsMobileSidebarOpen(false)
+  }
+
   // Filter current folder contents
   const currentFolders = contents?.folders.filter(f => f.parentId === currentFolderId) || []
   const currentFiles = contents?.files.filter(f => f.folderId === currentFolderId) || []
@@ -191,17 +202,52 @@ export default function Drive() {
 
   return (
     <div className="drive-container">
+      {/* Mobile Top Selector Bar */}
+      <div className="mobile-class-selector-bar">
+        <button
+          className="mobile-class-btn"
+          onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+        >
+          <span>📂</span>
+          <span>{activeClass ? activeClass.name : 'Choisir une classe'}</span>
+          <span style={{ fontSize: '0.7rem', marginLeft: 'auto' }}>{isMobileSidebarOpen ? '▲' : '▼'}</span>
+        </button>
+        {user?.role === 'ADMIN' && (
+          <button
+            className="action-btn-mini"
+            style={{ background: 'rgba(115, 118, 196, 0.15)', padding: '0.4rem 0.6rem', borderRadius: '8px', fontSize: '0.85rem' }}
+            onClick={() => {
+              setEditingClassData(null)
+              setShowConfigModal(true)
+            }}
+          >
+            + Classe
+          </button>
+        )}
+      </div>
+
       {/* Sidebar: Class List */}
-      <aside className="drive-sidebar">
-        <h2 className="sidebar-title">
-          📂 Drive & Cours
-        </h2>
+      <aside className={`drive-sidebar ${isMobileSidebarOpen ? 'mobile-open' : ''}`}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h2 className="sidebar-title">
+            📂 Drive & Cours
+          </h2>
+          {isMobileSidebarOpen && (
+            <button
+              onClick={() => setIsMobileSidebarOpen(false)}
+              style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer' }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
         {user?.role === 'ADMIN' && (
           <button
             className="create-class-btn"
             onClick={() => {
               setEditingClassData(null)
               setShowConfigModal(true)
+              setIsMobileSidebarOpen(false)
             }}
           >
             + Créer une classe

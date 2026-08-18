@@ -23,11 +23,11 @@ export function makeTrpcClient() {
       splitLink({
         condition: (op) => op.type === 'subscription',
         true: httpSubscriptionLink({
-          url: 'http://localhost:3001/trpc',
+          url: `${import.meta.env.API_BASE_URL || 'http://localhost:3001'}/trpc`,
           connectionParams: getHeaders,
         }),
         false: httpBatchLink({
-          url: 'http://localhost:3001/trpc',
+          url: `${import.meta.env.API_BASE_URL || 'http://localhost:3001'}/trpc`,
           headers: getHeaders,
         }),
       }),

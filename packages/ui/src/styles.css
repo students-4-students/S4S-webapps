@@ -265,6 +265,11 @@
   color: #ffffff;
 }
 
+.s4s-modal-container select option {
+  background-color: #1e1530;
+  color: #ffffff;
+}
+
 .s4s-modal-container .s4s-input::placeholder,
 .s4s-modal-container .s4s-textarea::placeholder {
   color: rgba(255, 255, 255, 0.4);

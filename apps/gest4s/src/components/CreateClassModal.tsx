@@ -15,7 +15,7 @@ const DAYS = [
 ]
 
 const SECTIONS = [
-  'CMS', 'POLYSI', 'AR', 'CH', 'EL', 'GC', 'IN', 'MA', 'ME', 'MT', 'MX', 'PH', 'SC', 'SIE', 'SV'
+  'CMS', 'POLYSI', 'AR', 'CH', 'EL', 'GC', 'IN', 'MA', 'GM', 'MT', 'MX', 'PH', 'SC', 'SIE', 'SV'
 ]
 
 interface Session {
@@ -46,6 +46,9 @@ function CreateClassModal({ defaultSection, initialData, onClose }: Props) {
         ? defaultSection.toUpperCase()
         : 'CMS',
   ])
+  const [targetGroup, setTargetGroup] = useState<'ALL' | 'A' | 'B'>(
+    initialData?.targetGroup || 'ALL'
+  )
 
   const formatHHMM = (dStr: string | Date) => {
     const d = new Date(dStr)
@@ -129,6 +132,19 @@ function CreateClassModal({ defaultSection, initialData, onClose }: Props) {
     }
   }
 
+  const selectAllExceptPolysi = () => {
+    setSelectedSections(SECTIONS.filter((s) => s !== 'POLYSI'))
+  }
+
+  const selectBA1 = () => {
+    const excluded = ['POLYSI', 'MA', 'PH', 'CMS', 'AR']
+    setSelectedSections(SECTIONS.filter((s) => !excluded.includes(s)))
+  }
+
+  const selectPhMa = () => {
+    setSelectedSections(['PH', 'MA'])
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (selectedSections.length === 0) {
@@ -151,6 +167,7 @@ function CreateClassModal({ defaultSection, initialData, onClose }: Props) {
               endTime: new Date(endStr),
               location: sess.location || undefined,
               sectionId: sec,
+              targetGroup: targetGroup === 'ALL' ? undefined : targetGroup,
               speakerId: speakerId || undefined,
               assistantId: assistantId || undefined,
               rcId: rcId || undefined,
@@ -238,7 +255,20 @@ function CreateClassModal({ defaultSection, initialData, onClose }: Props) {
         </div>
 
         <div style={{ marginBottom: '1rem' }}>
-          <label className="s4s-label">Sections * (Sélectionnez au moins une)</label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <label className="s4s-label">Sections * (Sélectionnez au moins une)</label>
+            <div style={{ display: 'flex', gap: '0.35rem' }}>
+              <Button type="button" variant="outline" size="sm" onClick={selectAllExceptPolysi} style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}>
+                Toutes (sans POLYSI)
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={selectBA1} style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}>
+                BA1
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={selectPhMa} style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}>
+                PH-MA
+              </Button>
+            </div>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem', marginTop: '0.375rem' }}>
             {SECTIONS.map((sec) => {
               const isSelected = selectedSections.includes(sec)
@@ -253,9 +283,9 @@ function CreateClassModal({ defaultSection, initialData, onClose }: Props) {
                     fontWeight: 600,
                     borderRadius: 'var(--s4s-radius-sm)',
                     border: '1px solid',
-                    borderColor: isSelected ? 'var(--s4s-primary)' : 'var(--s4s-border)',
-                    background: isSelected ? 'var(--s4s-primary)' : 'transparent',
-                    color: isSelected ? 'white' : 'var(--s4s-text-primary)',
+                    borderColor: isSelected ? 'var(--s4s-primary)' : 'rgba(255, 255, 255, 0.2)',
+                    background: isSelected ? 'var(--s4s-primary)' : 'rgba(255, 255, 255, 0.08)',
+                    color: '#ffffff',
                     cursor: 'pointer',
                     transition: 'all var(--s4s-transition-fast)',
                     textAlign: 'center'
@@ -265,6 +295,28 @@ function CreateClassModal({ defaultSection, initialData, onClose }: Props) {
                 </button>
               )
             })}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '1rem' }}>
+          <label className="s4s-label">Groupe concerné (Optionnel)</label>
+          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.35rem' }}>
+            {[
+              { id: 'ALL', label: 'Tous' },
+              { id: 'A', label: 'Groupe A' },
+              { id: 'B', label: 'Groupe B' },
+            ].map((grp) => (
+              <label key={grp.id} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '0.85rem', color: '#ffffff' }}>
+                <input
+                  type="radio"
+                  name="targetGroup"
+                  value={grp.id}
+                  checked={targetGroup === grp.id}
+                  onChange={() => setTargetGroup(grp.id as any)}
+                />
+                {grp.label}
+              </label>
+            ))}
           </div>
         </div>
 
@@ -279,9 +331,9 @@ function CreateClassModal({ defaultSection, initialData, onClose }: Props) {
                   gap: '0.4rem',
                   alignItems: 'center',
                   padding: '0.5rem',
-                  background: 'var(--s4s-bg-subtle)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   borderRadius: 'var(--s4s-radius-md)',
-                  border: '1px solid var(--s4s-border)'
+                  border: '1px solid rgba(238, 212, 241, 0.15)'
                 }}
               >
                 <select
@@ -306,7 +358,7 @@ function CreateClassModal({ defaultSection, initialData, onClose }: Props) {
                   onChange={(e) => updateSession(sess.id, 'startTime', e.target.value)}
                 />
 
-                <span style={{ fontSize: '0.8rem', color: 'var(--s4s-text-muted)' }}>à</span>
+                <span style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.7)' }}>à</span>
 
                 <input
                   type="time"

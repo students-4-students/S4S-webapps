@@ -93,24 +93,108 @@ export default function Schedule() {
     })
   }, [finalDates])
 
-  // 2. Filter slots for a specific date & user's section
+  // 2. Filter slots for a specific date, user's section & group (A/B)
   const slotsForDate = (dateStr: string) => {
     if (!slots) return []
     const userSectionId = me?.sectionId
+    const userGroup = me?.firstDayGroup
 
     return slots
       .filter((slot) => {
         if (getLocalDateString(slot.startTime) !== dateStr) return false
         
-        // Show if general slot or user is assigned to this section
-        if (userSectionId) {
-          return !slot.sectionId || slot.sectionId === userSectionId
+        // Filter by section if specified
+        if (userSectionId && slot.sectionId && slot.sectionId !== userSectionId) {
+          return false
         }
         
-        // If user has no section (e.g., admin, staff, or unassigned participant), show everything
+        // Filter by targetGroup (Groupe A or B) if specified on the slot
+        if (slot.targetGroup) {
+          if (!userGroup || userGroup !== slot.targetGroup) {
+            return false
+          }
+        }
+        
         return true
       })
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+  }
+
+  // Compute side-by-side positioning (left, width) for overlapping slots in a day column
+  const computeOverlappingLayout = (daySlots: any[]) => {
+    if (!daySlots || daySlots.length === 0) return new Map<string, { left: string; width: string }>()
+
+    const parsed = daySlots.map((slot) => {
+      const s = typeof slot.startTime === 'string' ? new Date(slot.startTime) : slot.startTime
+      const e = typeof slot.endTime === 'string' ? new Date(slot.endTime) : slot.endTime
+      return {
+        id: slot.id,
+        startMin: s.getHours() * 60 + s.getMinutes(),
+        endMin: e.getHours() * 60 + e.getMinutes(),
+      }
+    })
+
+    const clusters: typeof parsed[] = []
+    let currentCluster: typeof parsed = []
+    let clusterEnd = -1
+
+    const sorted = [...parsed].sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin)
+
+    for (const item of sorted) {
+      if (currentCluster.length === 0) {
+        currentCluster.push(item)
+        clusterEnd = item.endMin
+      } else if (item.startMin < clusterEnd) {
+        currentCluster.push(item)
+        if (item.endMin > clusterEnd) {
+          clusterEnd = item.endMin
+        }
+      } else {
+        clusters.push(currentCluster)
+        currentCluster = [item]
+        clusterEnd = item.endMin
+      }
+    }
+    if (currentCluster.length > 0) {
+      clusters.push(currentCluster)
+    }
+
+    const layoutMap = new Map<string, { left: string; width: string }>()
+
+    for (const cluster of clusters) {
+      const columns: (typeof parsed)[] = []
+      const itemCol = new Map<string, number>()
+
+      for (const item of cluster) {
+        let placed = false
+        for (let colIdx = 0; colIdx < columns.length; colIdx++) {
+          const lastInCol = columns[colIdx][columns[colIdx].length - 1]
+          if (lastInCol.endMin <= item.startMin) {
+            columns[colIdx].push(item)
+            itemCol.set(item.id, colIdx)
+            placed = true
+            break
+          }
+        }
+        if (!placed) {
+          columns.push([item])
+          itemCol.set(item.id, columns.length - 1)
+        }
+      }
+
+      const totalCols = columns.length
+      for (const item of cluster) {
+        const colIdx = itemCol.get(item.id) || 0
+        const widthPct = (100 / totalCols).toFixed(2)
+        const leftPct = ((colIdx * 100) / totalCols).toFixed(2)
+        layoutMap.set(item.id, {
+          left: `calc(${leftPct}% + ${colIdx > 0 ? 2 : 0}px)`,
+          width: `calc(${widthPct}% - 4px)`,
+        })
+      }
+    }
+
+    return layoutMap
   }
 
   if (loadingSlots) {
@@ -184,6 +268,7 @@ export default function Schedule() {
           {/* Day Columns (Contain background cells and absolute slots) */}
           {DAYS_DATA.map((day) => {
             const daySlots = slotsForDate(day.dateStr)
+            const layoutMap = computeOverlappingLayout(daySlots)
             return (
               <div className="day-body-column" key={day.dateStr}>
                 {/* Background Hour Lines */}
@@ -195,6 +280,10 @@ export default function Schedule() {
                 <div className="cards-container">
                   {daySlots.map((slot) => {
                     const cardStyle = calculateCardStyle(slot.startTime, slot.endTime)
+                    const sideStyle = layoutMap.get(slot.id)
+                    const combinedStyle = sideStyle
+                      ? { ...cardStyle, left: sideStyle.left, width: sideStyle.width, right: 'auto' }
+                      : cardStyle
                     const isLive = isCurrentlyHappening(slot.startTime, slot.endTime)
                     const typeClass = slot.type.toLowerCase() // lecture, exercise, workshop, activity, free, special, meal
 
@@ -202,7 +291,7 @@ export default function Schedule() {
                       <div
                         key={slot.id}
                         className={`slot-card-absolute ${typeClass} ${isLive ? 'live-slot' : ''}`}
-                        style={cardStyle}
+                        style={combinedStyle}
                         title={`${slot.title}\n🕒 ${formatTime(slot.startTime)} - ${formatTime(slot.endTime)}\n${slot.description || ''}`}
                       >
                         <div className="card-time">

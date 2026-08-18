@@ -15,7 +15,7 @@ const DAYS = [
 ]
 
 const SECTIONS = [
-  'CMS', 'POLYSI', 'AR', 'CH', 'EL', 'GC', 'IN', 'MA', 'ME', 'MT', 'MX', 'PH', 'SC', 'SIE', 'SV'
+  'CMS', 'POLYSI', 'AR', 'CH', 'EL', 'GC', 'IN', 'MA', 'GM', 'MT', 'MX', 'PH', 'SC', 'SIE', 'SV'
 ]
 
 interface Props {
@@ -52,6 +52,9 @@ function EditClassModal({ slot, onClose, onDuplicate }: Props) {
   const [endTime, setEndTime] = useState(formatHHMM(endObj))
   const [location, setLocation] = useState(slot.location || '')
   const [sectionId, setSectionId] = useState(slot.section?.name || 'CMS')
+  const [targetGroup, setTargetGroup] = useState<'ALL' | 'A' | 'B'>(
+    slot.targetGroup || 'ALL'
+  )
   const [speakerId, setSpeakerId] = useState<string>(slot.speakerId || slot.speaker?.id || '')
   const [assistantId, setAssistantId] = useState<string>(slot.assistantId || slot.assistant?.id || '')
   const [rcId, setRcId] = useState<string>(slot.rcId || slot.rc?.id || '')
@@ -100,6 +103,7 @@ function EditClassModal({ slot, onClose, onDuplicate }: Props) {
       endTime: new Date(endStr),
       location: location || null,
       sectionId,
+      targetGroup: targetGroup === 'ALL' ? null : targetGroup,
       speakerId: speakerId || null,
       assistantId: assistantId || null,
       rcId: rcId || null,
@@ -201,6 +205,28 @@ function EditClassModal({ slot, onClose, onDuplicate }: Props) {
             </option>
           ))}
         </Select>
+
+        <div style={{ marginBottom: '1rem' }}>
+          <label className="s4s-label">Groupe concerné (Optionnel)</label>
+          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.35rem' }}>
+            {[
+              { id: 'ALL', label: 'Tous' },
+              { id: 'A', label: 'Groupe A' },
+              { id: 'B', label: 'Groupe B' },
+            ].map((grp) => (
+              <label key={grp.id} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '0.85rem', color: '#ffffff' }}>
+                <input
+                  type="radio"
+                  name="editTargetGroup"
+                  value={grp.id}
+                  checked={targetGroup === grp.id}
+                  onChange={() => setTargetGroup(grp.id as any)}
+                />
+                {grp.label}
+              </label>
+            ))}
+          </div>
+        </div>
 
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
           <div style={{ flex: 2 }}>
