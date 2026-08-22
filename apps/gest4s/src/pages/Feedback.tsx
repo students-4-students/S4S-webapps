@@ -10,13 +10,6 @@ import {
 } from '@s4s/ui'
 import '../../styles/feedback.css'
 
-export const LIKERT_5_OPTIONS = [
-  "Tout à fait d'accord",
-  "D'accord",
-  "Pas d'accord",
-  "Pas du tout d'accord",
-  "Sans avis",
-]
 
 type QuestionType = 'LIKERT_5' | 'OPEN_TEXT' | 'SINGLE_CHOICE' | 'MULTIPLE'
 
