@@ -3,14 +3,16 @@ FROM oven/bun:1 AS builder
 
 WORKDIR /app
 
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 COPY apps/s4s-connect/package.json ./apps/s4s-connect/
 COPY packages/types/package.json ./packages/types/
+COPY packages/ui/package.json ./packages/ui/
 
 RUN bun install --frozen-lockfile
 
 COPY apps/s4s-connect ./apps/s4s-connect
 COPY packages/types ./packages/types
+COPY packages/ui ./packages/ui
 
 WORKDIR /app/apps/s4s-connect
 
@@ -20,6 +22,5 @@ RUN bun run build
 FROM nginx:alpine AS runner
 
 COPY --from=builder /app/apps/s4s-connect/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
+COPY apps/s4s-connect/nginx.connect.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80

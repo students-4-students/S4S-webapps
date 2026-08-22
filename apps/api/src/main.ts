@@ -5,9 +5,14 @@ import { createContext } from './trpc/context'
 const ALLOWED_ORIGINS = ['http://localhost:5173', 'http://localhost:5174']
 
 const server = Bun.serve({
-  port: 3001,
+  port: Number(process.env.PORT ?? 3001),
   async fetch(req) {
     const url = new URL(req.url)
+
+    if (url.pathname === '/healthcheck') {
+      return new Response('ok', { status: 200 })
+    }
+
     const origin = req.headers.get('origin') ?? ''
     const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0]
 
