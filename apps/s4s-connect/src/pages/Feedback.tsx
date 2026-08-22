@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { trpc } from '../trpc'
 import { LIKERT_5_OPTIONS } from '../../../gest4s/src/pages/Feedback'
 
@@ -14,7 +14,7 @@ export default function S4SConnectFeedback() {
 
   // Queries
   const { data: surveys = [], isLoading } = trpc.feedback.list.useQuery()
-  const { data: activeSurvey, isLoading: loadingSurvey } = trpc.feedback.getById.useQuery(
+  const { data: activeSurvey } = trpc.feedback.getById.useQuery(
     { id: selectedSurveyId! },
     { enabled: Boolean(selectedSurveyId) }
   )
