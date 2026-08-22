@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Link } from '@tanstack/react-router'
 import { trpc } from '../trpc'
 import {
@@ -8,6 +8,7 @@ import {
   SearchInput,
   PageHeader,
   parseCSV,
+  MultiSelectCombobox,
 } from '@s4s/ui'
 import '../../styles/staffs.css'
 import '../../styles/dashboard.css'
@@ -40,9 +41,9 @@ function Staffs() {
   const [phone, setPhone] = useState('')
   const [telegramUsername, setTelegramUsername] = useState('')
   const [score, setScore] = useState(0)
-  const [selectedSpeakerSlotIds, setSelectedSpeakerSlotIds] = useState<string[]>([])
-  const [selectedAssistantSlotIds, setSelectedAssistantSlotIds] = useState<string[]>([])
-  const [selectedRcSlotIds, setSelectedRcSlotIds] = useState<string[]>([])
+  const [selectedSpeakerClassNames, setSelectedSpeakerClassNames] = useState<string[]>([])
+  const [selectedAssistantClassNames, setSelectedAssistantClassNames] = useState<string[]>([])
+  const [selectedRcClassNames, setSelectedRcClassNames] = useState<string[]>([])
 
   // Edit Form State
   const [editFirstName, setEditFirstName] = useState('')
@@ -52,14 +53,22 @@ function Staffs() {
   const [editPhone, setEditPhone] = useState('')
   const [editTelegramUsername, setEditTelegramUsername] = useState('')
   const [editScore, setEditScore] = useState(0)
-  const [editSpeakerSlotIds, setEditSpeakerSlotIds] = useState<string[]>([])
-  const [editAssistantSlotIds, setEditAssistantSlotIds] = useState<string[]>([])
-  const [editRcSlotIds, setEditRcSlotIds] = useState<string[]>([])
+  const [editSpeakerClassNames, setEditSpeakerClassNames] = useState<string[]>([])
+  const [editAssistantClassNames, setEditAssistantClassNames] = useState<string[]>([])
+  const [editRcClassNames, setEditRcClassNames] = useState<string[]>([])
 
   const utils = trpc.useUtils()
 
   // Queries and Mutations
   const { data: staffs = [], isLoading } = trpc.staffs.list.useQuery()
+  const { data: classNames = [] } = trpc.staffs.listClassNames.useQuery()
+
+  const courseOptions = useMemo(() => {
+    return classNames.map((name: string) => ({
+      id: name,
+      label: name,
+    }))
+  }, [classNames])
 
 
   trpc.staffs.onUpdated.useSubscription(undefined, {
@@ -117,9 +126,9 @@ function Staffs() {
       // Link newly selected courses
       await assignToCoursesMutation.mutateAsync({
         staffMemberId: newStaff.id,
-        speakerSlotIds: selectedSpeakerSlotIds,
-        assistantSlotIds: selectedAssistantSlotIds,
-        rcSlotIds: selectedRcSlotIds,
+        speakerClassNames: selectedSpeakerClassNames,
+        assistantClassNames: selectedAssistantClassNames,
+        rcClassNames: selectedRcClassNames,
       })
 
       alert('Membre du staff créé avec succès !')
@@ -132,9 +141,9 @@ function Staffs() {
       setPhone('')
       setTelegramUsername('')
       setScore(0)
-      setSelectedSpeakerSlotIds([])
-      setSelectedAssistantSlotIds([])
-      setSelectedRcSlotIds([])
+      setSelectedSpeakerClassNames([])
+      setSelectedAssistantClassNames([])
+      setSelectedRcClassNames([])
 
       utils.staffs.list.invalidate()
     } catch (err: any) {
@@ -158,9 +167,29 @@ function Staffs() {
     setEditTelegramUsername(staff.telegramUsername || '')
     setEditScore(staff.score || 0)
 
-    setEditSpeakerSlotIds(staff.speakerSlots?.map((s: any) => s.id) || [])
-    setEditAssistantSlotIds(staff.assistantSlots?.map((s: any) => s.id) || [])
-    setEditRcSlotIds(staff.rcSlots?.map((s: any) => s.id) || [])
+    const speakerNames = Array.from(
+      new Set([
+        ...(staff.speakerSlots?.map((s: any) => s.title) || []),
+        ...(staff.Class_SpeakerClasses?.map((c: any) => c.name) || []),
+      ])
+    )
+    setEditSpeakerClassNames(speakerNames)
+
+    const assistantNames = Array.from(
+      new Set([
+        ...(staff.assistantSlots?.map((s: any) => s.title) || []),
+        ...(staff.Class_AssistantClasses?.map((c: any) => c.name) || []),
+      ])
+    )
+    setEditAssistantClassNames(assistantNames)
+
+    const rcNames = Array.from(
+      new Set([
+        ...(staff.rcSlots?.map((s: any) => s.title) || []),
+        ...(staff.Class_RcClasses?.map((c: any) => c.name) || []),
+      ])
+    )
+    setEditRcClassNames(rcNames)
 
     setShowEditModal(true)
   }
@@ -186,9 +215,9 @@ function Staffs() {
 
       await assignToCoursesMutation.mutateAsync({
         staffMemberId: editingStaff.id,
-        speakerSlotIds: editSpeakerSlotIds,
-        assistantSlotIds: editAssistantSlotIds,
-        rcSlotIds: editRcSlotIds,
+        speakerClassNames: editSpeakerClassNames,
+        assistantClassNames: editAssistantClassNames,
+        rcClassNames: editRcClassNames,
       })
 
       alert('Membre du staff modifié avec succès !')
@@ -279,14 +308,40 @@ function Staffs() {
     const isRc = staff.role.toLowerCase().includes('rc')
     const coursesList: string[] = []
 
-    if (isSpeaker && staff.speakerSlots && staff.speakerSlots.length > 0) {
-      coursesList.push(...staff.speakerSlots.map((s: any) => `${s.title} (Speaker)`))
+    if (isSpeaker) {
+      const speakerTitles = Array.from(
+        new Set([
+          ...(staff.speakerSlots?.map((s: any) => s.title) || []),
+          ...(staff.Class_SpeakerClasses?.map((c: any) => c.name) || []),
+        ])
+      )
+      if (speakerTitles.length > 0) {
+        coursesList.push(...speakerTitles.map((t) => `${t} (Speaker)`))
+      }
     }
-    if (isAssistant && staff.assistantSlots && staff.assistantSlots.length > 0) {
-      coursesList.push(...staff.assistantSlots.map((s: any) => `${s.title} (Assistant)`))
+
+    if (isAssistant) {
+      const assistantTitles = Array.from(
+        new Set([
+          ...(staff.assistantSlots?.map((s: any) => s.title) || []),
+          ...(staff.Class_AssistantClasses?.map((c: any) => c.name) || []),
+        ])
+      )
+      if (assistantTitles.length > 0) {
+        coursesList.push(...assistantTitles.map((t) => `${t} (Assistant)`))
+      }
     }
-    if (isRc && staff.rcSlots && staff.rcSlots.length > 0) {
-      coursesList.push(...staff.rcSlots.map((s: any) => `${s.title} (RC)`))
+
+    if (isRc) {
+      const rcTitles = Array.from(
+        new Set([
+          ...(staff.rcSlots?.map((s: any) => s.title) || []),
+          ...(staff.Class_RcClasses?.map((c: any) => c.name) || []),
+        ])
+      )
+      if (rcTitles.length > 0) {
+        coursesList.push(...rcTitles.map((t) => `${t} (RC)`))
+      }
     }
 
     return coursesList.length > 0 ? coursesList.join(', ') : '-'
@@ -346,8 +401,6 @@ function Staffs() {
                   <th>Telegram</th>
                   <th>Téléphone</th>
                   <th>Email</th>
-                  <th style={{ textAlign: 'center', width: '100px' }}>Quêtes (Score)</th>
-                  <th>Cours liés</th>
                   <th style={{ width: '80px', textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
@@ -377,28 +430,6 @@ function Staffs() {
                     <td>{staff.telegramUsername || '-'}</td>
                     <td>{staff.phone || '-'}</td>
                     <td>{staff.email || '-'}</td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'center' }}>
-                        <button
-                          type="button"
-                          className="action-btn"
-                          onClick={() => handleInlineUpdate(staff.id, { score: Math.max(0, staff.score - 1) })}
-                          style={{ fontSize: '0.8rem', padding: '0.1rem 0.4rem', background: 'rgba(0,0,0,0.08)', borderRadius: '0.25rem' }}
-                        >
-                          -
-                        </button>
-                        <span style={{ fontWeight: 600, minWidth: '1.2rem', textAlign: 'center' }}>{staff.score}</span>
-                        <button
-                          type="button"
-                          className="action-btn"
-                          onClick={() => handleInlineUpdate(staff.id, { score: staff.score + 1 })}
-                          style={{ fontSize: '0.8rem', padding: '0.1rem 0.4rem', background: 'rgba(0,0,0,0.08)', borderRadius: '0.25rem' }}
-                        >
-                          +
-                        </button>
-                      </div>
-                    </td>
-                    <td>{getLinkedCoursesLabel(staff)}</td>
                     <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                       <button
                         className="action-btn"
@@ -460,6 +491,42 @@ function Staffs() {
               ))}
             </div>
           </div>
+
+          {selectedRoles.some((r) => r.toLowerCase().includes('speaker')) && (
+            <div style={{ marginTop: '0.75rem', marginBottom: '0.75rem' }}>
+              <MultiSelectCombobox
+                label="Classes / Cours pour Speaker"
+                placeholder="Rechercher et sélectionner des cours pour Speaker..."
+                options={courseOptions}
+                selectedIds={selectedSpeakerClassNames}
+                onChange={setSelectedSpeakerClassNames}
+              />
+            </div>
+          )}
+
+          {selectedRoles.some((r) => r.toLowerCase().includes('assistant')) && (
+            <div style={{ marginTop: '0.75rem', marginBottom: '0.75rem' }}>
+              <MultiSelectCombobox
+                label="Classes / Cours pour Assistant"
+                placeholder="Rechercher et sélectionner des cours pour Assistant..."
+                options={courseOptions}
+                selectedIds={selectedAssistantClassNames}
+                onChange={setSelectedAssistantClassNames}
+              />
+            </div>
+          )}
+
+          {selectedRoles.some((r) => r.toLowerCase().includes('rc')) && (
+            <div style={{ marginTop: '0.75rem', marginBottom: '0.75rem' }}>
+              <MultiSelectCombobox
+                label="Classes / Cours pour Responsable de cours (RC)"
+                placeholder="Rechercher et sélectionner des cours pour RC..."
+                options={courseOptions}
+                selectedIds={selectedRcClassNames}
+                onChange={setSelectedRcClassNames}
+              />
+            </div>
+          )}
 
           <Input
             label="Email"
@@ -529,6 +596,42 @@ function Staffs() {
               ))}
             </div>
           </div>
+
+          {(editSelectedRoles.some((r) => r.toLowerCase().includes('speaker')) || editSpeakerClassNames.length > 0) && (
+            <div style={{ marginTop: '0.75rem', marginBottom: '0.75rem' }}>
+              <MultiSelectCombobox
+                label="Classes / Cours pour Speaker"
+                placeholder="Rechercher et sélectionner des cours pour Speaker..."
+                options={courseOptions}
+                selectedIds={editSpeakerClassNames}
+                onChange={setEditSpeakerClassNames}
+              />
+            </div>
+          )}
+
+          {(editSelectedRoles.some((r) => r.toLowerCase().includes('assistant')) || editAssistantClassNames.length > 0) && (
+            <div style={{ marginTop: '0.75rem', marginBottom: '0.75rem' }}>
+              <MultiSelectCombobox
+                label="Classes / Cours pour Assistant"
+                placeholder="Rechercher et sélectionner des cours pour Assistant..."
+                options={courseOptions}
+                selectedIds={editAssistantClassNames}
+                onChange={setEditAssistantClassNames}
+              />
+            </div>
+          )}
+
+          {(editSelectedRoles.some((r) => r.toLowerCase().includes('rc')) || editRcClassNames.length > 0) && (
+            <div style={{ marginTop: '0.75rem', marginBottom: '0.75rem' }}>
+              <MultiSelectCombobox
+                label="Classes / Cours pour Responsable de cours (RC)"
+                placeholder="Rechercher et sélectionner des cours pour RC..."
+                options={courseOptions}
+                selectedIds={editRcClassNames}
+                onChange={setEditRcClassNames}
+              />
+            </div>
+          )}
 
           <Input
             label="Score (Quêtes faites)"

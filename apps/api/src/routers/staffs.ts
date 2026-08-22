@@ -13,9 +13,29 @@ export const staffsRouter = router({
         speakerSlots: { select: { id: true, title: true } },
         assistantSlots: { select: { id: true, title: true } },
         rcSlots: { select: { id: true, title: true } },
+        Class_SpeakerClasses: { select: { id: true, name: true } },
+        Class_AssistantClasses: { select: { id: true, name: true } },
+        Class_RcClasses: { select: { id: true, name: true } },
       },
     });
     return staffs;
+  }),
+
+  listClassNames: protectedProcedure.query(async ({ ctx }) => {
+    const slots = await ctx.db.scheduleSlot.findMany({
+      select: { title: true },
+    })
+    const classes = await ctx.db.class.findMany({
+      select: { name: true },
+    })
+    const allNames = new Set<string>()
+    slots.forEach((s) => {
+      if (s.title && s.title.trim()) allNames.add(s.title.trim())
+    })
+    classes.forEach((c) => {
+      if (c.name && c.name.trim()) allNames.add(c.name.trim())
+    })
+    return Array.from(allNames).sort((a, b) => a.localeCompare(b))
   }),
 
   create: protectedProcedure
@@ -124,49 +144,71 @@ export const staffsRouter = router({
     .input(
       z.object({
         staffMemberId: z.string(),
-        speakerSlotIds: z.array(z.string()),
-        assistantSlotIds: z.array(z.string()),
-        rcSlotIds: z.array(z.string()),
+        speakerClassNames: z.array(z.string()).optional().default([]),
+        assistantClassNames: z.array(z.string()).optional().default([]),
+        rcClassNames: z.array(z.string()).optional().default([]),
+        speakerSlotIds: z.array(z.string()).optional().default([]),
+        assistantSlotIds: z.array(z.string()).optional().default([]),
+        rcSlotIds: z.array(z.string()).optional().default([]),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      console.log(`[DEBUG] [StaffsRouter] Re-assigning course slots for staff member ${input.staffMemberId}`);
+      console.log(`[DEBUG] [StaffsRouter] Re-assigning classes for staff member ${input.staffMemberId}`);
       
-      // Unlink previous slots
+      const { staffMemberId, speakerClassNames = [], assistantClassNames = [], rcClassNames = [] } = input;
+
+      // Handle Speaker assignments by Class Name
       await ctx.db.scheduleSlot.updateMany({
-        where: { speakerId: input.staffMemberId },
+        where: { speakerId: staffMemberId, title: { notIn: speakerClassNames } },
         data: { speakerId: null },
       });
+      if (speakerClassNames.length > 0) {
+        await ctx.db.scheduleSlot.updateMany({
+          where: { title: { in: speakerClassNames } },
+          data: { speakerId: staffMemberId },
+        });
+      }
+
+      // Handle Assistant assignments by Class Name
       await ctx.db.scheduleSlot.updateMany({
-        where: { assistantId: input.staffMemberId },
+        where: { assistantId: staffMemberId, title: { notIn: assistantClassNames } },
         data: { assistantId: null },
       });
+      if (assistantClassNames.length > 0) {
+        await ctx.db.scheduleSlot.updateMany({
+          where: { title: { in: assistantClassNames } },
+          data: { assistantId: staffMemberId },
+        });
+      }
+
+      // Handle RC assignments by Class Name
       await ctx.db.scheduleSlot.updateMany({
-        where: { rcId: input.staffMemberId },
+        where: { rcId: staffMemberId, title: { notIn: rcClassNames } },
         data: { rcId: null },
       });
-
-      // Link new slots
-      if (input.speakerSlotIds.length > 0) {
+      if (rcClassNames.length > 0) {
         await ctx.db.scheduleSlot.updateMany({
-          where: { id: { in: input.speakerSlotIds } },
-          data: { speakerId: input.staffMemberId },
-        });
-      }
-      if (input.assistantSlotIds.length > 0) {
-        await ctx.db.scheduleSlot.updateMany({
-          where: { id: { in: input.assistantSlotIds } },
-          data: { assistantId: input.staffMemberId },
-        });
-      }
-      if (input.rcSlotIds.length > 0) {
-        await ctx.db.scheduleSlot.updateMany({
-          where: { id: { in: input.rcSlotIds } },
-          data: { rcId: input.staffMemberId },
+          where: { title: { in: rcClassNames } },
+          data: { rcId: staffMemberId },
         });
       }
 
-      console.log(`[DEBUG] [StaffsRouter] Re-assigned slots successfully`);
+      // Also update Class relations if Class entities exist in DB
+      const allMatchingClasses = await ctx.db.class.findMany({ select: { id: true, name: true } });
+      const speakerClassIds = allMatchingClasses.filter(c => speakerClassNames.includes(c.name)).map(c => ({ id: c.id }));
+      const assistantClassIds = allMatchingClasses.filter(c => assistantClassNames.includes(c.name)).map(c => ({ id: c.id }));
+      const rcClassIds = allMatchingClasses.filter(c => rcClassNames.includes(c.name)).map(c => ({ id: c.id }));
+
+      await ctx.db.staffMember.update({
+        where: { id: staffMemberId },
+        data: {
+          Class_SpeakerClasses: { set: speakerClassIds },
+          Class_AssistantClasses: { set: assistantClassIds },
+          Class_RcClasses: { set: rcClassIds },
+        },
+      });
+
+      console.log(`[DEBUG] [StaffsRouter] Re-assigned classes successfully`);
       staffsEmitter.emit('updated')
       return { success: true };
     }),
