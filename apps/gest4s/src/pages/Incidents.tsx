@@ -119,7 +119,7 @@ function Incidents() {
           )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
             {filtered.map((incident) => (
-              <IncidentCard key={incident.id} incident={incident} />
+              <IncidentCard key={incident.id} incident={incident} showDelete={true} />
             ))}
           </div>
         </div>

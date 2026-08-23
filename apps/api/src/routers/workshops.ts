@@ -11,9 +11,11 @@ export const workshopsRouter = router({
     return ctx.db.workshop.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
+        room: true,
         dates: {
           orderBy: { startTime: 'asc' },
           include: {
+            room: true,
             registrations: {
               include: {
                 user: {
@@ -33,30 +35,39 @@ export const workshopsRouter = router({
     .input(z.object({
       title: z.string().min(1),
       location: z.string().min(1),
+      roomId: z.string().nullable().optional(),
       description: z.string().min(1),
       image: z.string().optional(),
       requiresRegistration: z.boolean().default(false),
+      externalRegistrationUrl: z.string().nullable().optional(),
       maxParticipants: z.number().nullable().optional(),
       dates: z.array(z.object({
         startTime: z.string(),
         endTime: z.string(),
+        location: z.string().nullable().optional(),
+        roomId: z.string().nullable().optional(),
       })).min(1),
     }))
     .mutation(async ({ input, ctx }) => {
-      const { dates, ...data } = input
+      const { dates, roomId, ...data } = input
       const workshop = await ctx.db.workshop.create({
         data: {
           ...data,
+          roomId: roomId || null,
           dates: {
             create: dates.map(d => ({
               startTime: new Date(d.startTime),
               endTime: new Date(d.endTime),
+              location: d.location || null,
+              roomId: d.roomId || null,
             })),
           },
         },
         include: {
+          room: true,
           dates: {
             include: {
+              room: true,
               registrations: true,
             },
           },
@@ -71,25 +82,34 @@ export const workshopsRouter = router({
       id: z.string(),
       title: z.string().min(1).optional(),
       location: z.string().min(1).optional(),
+      roomId: z.string().nullable().optional(),
       description: z.string().min(1).optional(),
       image: z.string().optional(),
       requiresRegistration: z.boolean().optional(),
+      externalRegistrationUrl: z.string().nullable().optional(),
       maxParticipants: z.number().nullable().optional(),
       dates: z.array(z.object({
         startTime: z.string(),
         endTime: z.string(),
+        location: z.string().nullable().optional(),
+        roomId: z.string().nullable().optional(),
       })).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      const { id, dates, ...data } = input
+      const { id, dates, roomId, ...data } = input
 
       const updateData: any = { ...data }
+      if (roomId !== undefined) {
+        updateData.roomId = roomId || null
+      }
       if (dates) {
         updateData.dates = {
           deleteMany: {},
           create: dates.map(d => ({
             startTime: new Date(d.startTime),
             endTime: new Date(d.endTime),
+            location: d.location || null,
+            roomId: d.roomId || null,
           })),
         }
       }
@@ -98,8 +118,10 @@ export const workshopsRouter = router({
         where: { id },
         data: updateData,
         include: {
+          room: true,
           dates: {
             include: {
+              room: true,
               registrations: true,
             },
           },
@@ -107,6 +129,136 @@ export const workshopsRouter = router({
       })
       workshopEmitter.emit('updated')
       return workshop
+    }),
+
+  checkConflicts: protectedProcedure
+    .input(z.object({
+      workshopId: z.string().optional(),
+      slots: z.array(z.object({
+        startTime: z.coerce.date(),
+        endTime: z.coerce.date(),
+        roomId: z.string().nullable().optional(),
+        location: z.string().nullable().optional(),
+      })),
+    }))
+    .query(async ({ input, ctx }) => {
+      const conflicts: Array<{
+        slotIndex: number
+        type: 'SCHEDULE' | 'WORKSHOP' | 'TASK' | 'AVAILABILITY'
+        message: string
+        severity: 'WARNING' | 'ERROR'
+      }> = []
+
+      const allRooms = await ctx.db.room.findMany({
+        include: { availabilities: true },
+      })
+      const roomMap = new Map(allRooms.map((r: any) => [r.id, r]))
+      const roomNameMap = new Map(allRooms.map((r: any) => [r.name.trim().toUpperCase(), r]))
+
+      for (let i = 0; i < input.slots.length; i++) {
+        const slot = input.slots[i]
+        if (!slot.startTime || !slot.endTime) continue
+        const startTime = new Date(slot.startTime)
+        const endTime = new Date(slot.endTime)
+        if (isNaN(startTime.getTime()) || isNaN(endTime.getTime()) || endTime <= startTime) continue
+
+        // Find associated room entity
+        let targetRoom: any = null
+        if (slot.roomId && roomMap.has(slot.roomId)) {
+          targetRoom = roomMap.get(slot.roomId)
+        } else if (slot.location) {
+          const locName = slot.location.trim().toUpperCase()
+          targetRoom = roomNameMap.get(locName) || null
+        }
+
+        const targetRoomId = targetRoom?.id || slot.roomId || null
+        const locationName = targetRoom?.name || slot.location || null
+
+        if (!targetRoomId && !locationName) continue
+
+        // 1. Check ScheduleSlot conflicts
+        const scheduleSlots = await ctx.db.scheduleSlot.findMany({
+          where: {
+            startTime: { lt: endTime },
+            endTime: { gt: startTime },
+            OR: [
+              targetRoomId ? { roomId: targetRoomId } : undefined,
+              locationName ? { location: { contains: locationName, mode: 'insensitive' } } : undefined,
+            ].filter(Boolean) as any,
+          },
+        })
+        for (const s of scheduleSlots) {
+          conflicts.push({
+            slotIndex: i,
+            type: 'SCHEDULE',
+            severity: 'ERROR',
+            message: `La salle '${locationName || targetRoom?.name}' est occupée par le cours '${s.title}' (${new Date(s.startTime).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })} - ${new Date(s.endTime).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })}).`,
+          })
+        }
+
+        // 2. Check other WorkshopSession conflicts
+        const workshopSessions = await ctx.db.workshopSession.findMany({
+          where: {
+            workshopId: input.workshopId ? { not: input.workshopId } : undefined,
+            startTime: { lt: endTime },
+            endTime: { gt: startTime },
+            OR: [
+              targetRoomId ? { roomId: targetRoomId } : undefined,
+              locationName ? { location: { contains: locationName, mode: 'insensitive' } } : undefined,
+              targetRoomId ? { workshop: { roomId: targetRoomId } } : undefined,
+              locationName ? { workshop: { location: { contains: locationName, mode: 'insensitive' } } } : undefined,
+            ].filter(Boolean) as any,
+          },
+          include: { workshop: true },
+        })
+        for (const ws of workshopSessions) {
+          conflicts.push({
+            slotIndex: i,
+            type: 'WORKSHOP',
+            severity: 'ERROR',
+            message: `La salle '${locationName || targetRoom?.name}' est occupée par le workshop '${ws.workshop.title}' (${new Date(ws.startTime).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })} - ${new Date(ws.endTime).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })}).`,
+          })
+        }
+
+        // 3. Check Task conflicts
+        const tasks = await ctx.db.task.findMany({
+          where: {
+            startTime: { lt: endTime },
+            endTime: { gt: startTime },
+            OR: [
+              targetRoomId ? { roomId: targetRoomId } : undefined,
+              locationName ? { location: { contains: locationName, mode: 'insensitive' } } : undefined,
+            ].filter(Boolean) as any,
+          },
+        })
+        for (const t of tasks) {
+          conflicts.push({
+            slotIndex: i,
+            type: 'TASK',
+            severity: 'ERROR',
+            message: `La salle '${locationName || targetRoom?.name}' est réservée pour la tâche '${t.name}' (${new Date(t.startTime).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })} - ${new Date(t.endTime).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })}).`,
+          })
+        }
+
+        // 4. Check Room Availability if targetRoom is defined and has availabilities
+        if (targetRoom && targetRoom.availabilities && targetRoom.availabilities.length > 0) {
+          const isAvailable = targetRoom.availabilities.some((avail: any) => {
+            const aStart = new Date(avail.startTime).getTime()
+            const aEnd = new Date(avail.endTime).getTime()
+            return startTime.getTime() >= aStart && endTime.getTime() <= aEnd
+          })
+          if (!isAvailable) {
+            conflicts.push({
+              slotIndex: i,
+              type: 'AVAILABILITY',
+              severity: 'WARNING',
+              message: `La salle '${targetRoom.name}' n'est pas déclarée comme disponible sur ce créneau dans le planning des salles.`,
+            })
+          }
+        }
+      }
+
+      return conflicts
     }),
 
   delete: protectedProcedure

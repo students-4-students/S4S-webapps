@@ -4,7 +4,6 @@ import {
   Modal,
   Button,
   Input,
-  Select,
   PageHeader,
   EmptyState,
   LoadingSpinner,
@@ -416,7 +415,8 @@ export default function Gest4SFeedback() {
           <EmptyState
             title="Aucun sondage créé"
             description="Cliquez sur le bouton ci-dessus pour créer votre premier sondage étudiant."
-            action={<Button variant="primary" onClick={openCreateModal}>+ Créer un sondage</Button>}
+            actionLabel="+ Créer un sondage"
+            onAction={openCreateModal}
           />
         ) : (
           <div className="feedback-grid">
@@ -648,7 +648,7 @@ export default function Gest4SFeedback() {
           isOpen={showBuilderModal}
           onClose={closeBuilderModal}
           title={editingSurveyId ? 'Éditer le sondage étudiant' : 'Créer un sondage étudiant'}
-          width="850px"
+          size="lg"
         >
           <form onSubmit={handleSaveSurvey} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxHeight: '80vh', overflowY: 'auto', paddingRight: '4px' }}>
             <div>

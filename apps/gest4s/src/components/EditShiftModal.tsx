@@ -59,8 +59,6 @@ export default function EditShiftModal({ shift, onClose }: Props) {
   const [location, setLocation] = useState(rawShift.location || '')
   const [notes, setNotes] = useState(rawShift.notes || '')
 
-  const { data: staffs = [] } = trpc.staffs.list.useQuery()
-
   const updateMutation = trpc.shifts.update.useMutation({
     onSuccess: () => {
       utils.shifts.list.invalidate()

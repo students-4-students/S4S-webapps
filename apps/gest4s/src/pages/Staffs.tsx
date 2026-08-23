@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react'
-import { Link } from '@tanstack/react-router'
 import { trpc } from '../trpc'
 import {
   Modal,
@@ -395,7 +394,8 @@ function Staffs() {
                 <tr>
                   <th>Prénom</th>
                   <th>Nom</th>
-                  <th>Rôle(s)</th>
+                  <th>Rôle</th>
+                  <th>Cours</th>
                   <th>Statut</th>
                   <th>Présence</th>
                   <th>Telegram</th>
@@ -410,6 +410,7 @@ function Staffs() {
                     <td>{staff.firstName}</td>
                     <td>{staff.lastName}</td>
                     <td>{staff.role}</td>
+                    <td style={{ fontSize: '0.8rem' }}>{getLinkedCoursesLabel(staff)}</td>
                     <td>
                       <select
                         value={staff.status}

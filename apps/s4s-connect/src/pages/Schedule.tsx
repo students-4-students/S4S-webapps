@@ -104,8 +104,15 @@ export default function Schedule() {
         if (getLocalDateString(slot.startTime) !== dateStr) return false
         
         // Filter by section if specified
-        if (userSectionId && slot.sectionId && slot.sectionId !== userSectionId) {
-          return false
+        if (userSectionId) {
+          const slotSectionIds = [
+            slot.sectionId,
+            ...((slot as any).sections || []).map((s: any) => s.id),
+          ].filter(Boolean)
+
+          if (slotSectionIds.length > 0 && !slotSectionIds.includes(userSectionId)) {
+            return false
+          }
         }
         
         // Filter by targetGroup (Groupe A or B) if specified on the slot
@@ -305,7 +312,7 @@ export default function Schedule() {
                           {slot.location && (
                             <Link
                               to="/map"
-                              search={{ places: slot.location.split(' ')[0] } as any}
+                              search={{ places: slot.location } as any}
                               className="card-meta-item location-link"
                               style={{ color: 'inherit', textDecoration: 'none', cursor: 'pointer' }}
                               title="Voir sur le plan"

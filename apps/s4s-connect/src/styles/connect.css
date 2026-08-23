@@ -611,6 +611,34 @@ body:has(.schedule-container) .app-main {
 }
 
 /* Adjust layout on desktop vs mobile for schedule container */
+@media (max-width: 1024px) {
+  body:has(.schedule-container) .app-main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    height: calc(100vh - 60px - 68px) !important;
+  }
+
+  .schedule-container {
+    padding-top: 0.5rem !important;
+    gap: 0.5rem !important;
+    height: 100% !important;
+  }
+
+  .schedule-header {
+    padding: 0 0.75rem !important;
+    margin-bottom: 0 !important;
+  }
+
+  .calendar-container {
+    border-radius: 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
+    max-height: 100% !important;
+  }
+}
+
 @media (min-width: 1025px) {
   body:has(.schedule-container) .app-main {
     max-width: 1400px;
@@ -682,15 +710,14 @@ body:has(.schedule-container) .app-main {
 }
 
 .map-sidebar {
-  width: 280px;
-  background-color: rgba(26, 17, 43, 0.95);
-  backdrop-filter: blur(10px);
-  border-right: 1px solid rgba(255,255,255,0.08);
+  width: 320px;
+  flex-shrink: 0;
+  background-color: var(--s4s-bg-card, #ffffff);
+  border-right: 1px solid var(--s4s-border, #e2e8f0);
   display: flex;
   flex-direction: column;
   height: 100%;
   z-index: 10;
-  transition: all var(--transition-normal);
 }
 
 .map-search-box {
@@ -703,19 +730,26 @@ body:has(.schedule-container) .app-main {
 
 .map-search-box input {
   width: 100%;
-  background-color: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.12);
-  color: white;
-  border-radius: var(--radius-lg);
-  padding: 0.6rem 2.2rem 0.6rem 2.2rem;
-  font-size: 0.85rem;
+  background-color: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  color: #0f172a;
+  border-radius: var(--s4s-radius-md, 8px);
+  padding: 0.6rem 0.8rem;
+  font-size: 0.88rem;
+  font-weight: 500;
   outline: none;
-  transition: all var(--transition-fast);
+  transition: all 150ms ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.map-search-box input::placeholder {
+  color: #64748b;
 }
 
 .map-search-box input:focus {
-  border-color: var(--secondary-pink);
-  background-color: rgba(255,255,255,0.12);
+  border-color: #2563eb;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
 .map-search-box .search-icon {
@@ -1000,10 +1034,12 @@ body:has(.schedule-container) .app-main {
   }
 
   .map-sidebar {
-    width: 100%;
-    height: 220px;
+    width: 100% !important;
+    height: 240px;
+    max-height: 45vh;
     border-right: none;
-    border-top: 1px solid rgba(255,255,255,0.08);
+    border-top: 1px solid var(--s4s-border, #e2e8f0);
+    box-sizing: border-box;
   }
 
   .places-list {
@@ -1040,6 +1076,22 @@ body:has(.map-page-container) .app-main {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+@media (max-width: 1024px) {
+  body:has(.map-page-container) .app-main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    height: calc(100vh - 60px - 68px) !important;
+  }
+
+  .map-page-container {
+    border-radius: 0 !important;
+    border: none !important;
+    height: 100% !important;
+    width: 100% !important;
+  }
 }
 
 @media (min-width: 1025px) {
@@ -1350,6 +1402,12 @@ body:has(.map-page-container) .app-main {
   border: 1px solid rgba(255, 255, 255, 0.25);
 }
 
+.badge-reg.external {
+  background: rgba(37, 99, 235, 0.85);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
 /* ── Card body ───────────────────────────── */
 .workshop-card-body {
   padding: 1.1rem;
@@ -1592,6 +1650,29 @@ body:has(.map-page-container) .app-main {
 
 .btn-slot-register.registered:hover .reg-hover-label {
   display: inline;
+}
+
+.btn-slot-register.external-link-btn {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.35);
+  text-decoration: none;
+}
+
+.btn-slot-register.external-link-btn:hover {
+  box-shadow: 0 5px 15px rgba(37, 99, 235, 0.5);
+  filter: brightness(1.1);
+}
+
+.detail-slot-btn.external-link-btn {
+  background: linear-gradient(135deg, #2563eb, #3b82f6) !important;
+  color: white !important;
+  border: none !important;
+  text-decoration: none;
+}
+
+.detail-slot-btn.external-link-btn:hover {
+  box-shadow: 0 5px 15px rgba(37, 99, 235, 0.45);
+  filter: brightness(1.1);
 }
 
 /* ── Map link ────────────────────────────── */
@@ -2989,4 +3070,62 @@ body:has(.map-page-container) .app-main {
   top: 0.85rem;
   right: 3.5rem;
   z-index: 10;
+}
+
+/* EPFL Leaflet Marker Styles */
+.epfl-leaflet-marker-container {
+  background: transparent;
+  border: none;
+}
+
+.epfl-map-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.epfl-map-marker:hover {
+  transform: scale(1.15);
+  z-index: 1000;
+}
+
+.epfl-marker-badge {
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 0.78rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 20px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+  border: 2px solid #ffffff;
+  white-space: nowrap;
+}
+
+.epfl-map-marker.is-highlighted .epfl-marker-badge,
+.epfl-map-marker.is-green-highlighted .epfl-marker-badge {
+  background: #10b981;
+  color: #ffffff;
+  border-color: #047857;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3);
+  animation: pulse-green-marker 1.5s infinite;
+}
+
+@keyframes pulse-green-marker {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.epfl-marker-count {
+  margin-top: 2px;
+  background: #10b981;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.1rem 0.35rem;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }

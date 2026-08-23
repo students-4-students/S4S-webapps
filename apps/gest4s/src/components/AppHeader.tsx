@@ -1,30 +1,20 @@
 import { useLocation } from '@tanstack/react-router'
 
-const ROUTE_TITLES: Record<string, string> = {
-  '/': 'Dashboard',
-  '/schedule': 'Planning',
-  '/operations': 'Opérations',
-  '/staffs': 'Staff',
-  '/students': 'Étudiants',
-  '/workshops': 'Workshops',
-  '/incidents': 'Incidents',
-  '/feedback': 'Sondages & Feedback',
-  '/scan': '📷 Scanner QR',
-}
-
-function getTitle(pathname: string): string {
-  // Exact match first
-  if (ROUTE_TITLES[pathname]) return ROUTE_TITLES[pathname]
-  // Prefix match (e.g. /incidents/123)
-  const prefix = Object.keys(ROUTE_TITLES).find(
-    (k) => k !== '/' && pathname.startsWith(k),
-  )
-  return prefix ? ROUTE_TITLES[prefix] : 'Gest4S'
-}
+const NAV_ITEMS = [
+  { path: '/', label: 'Dashboard' },
+  { path: '/schedule', label: 'Planning' },
+  { path: '/operations', label: 'Opérations' },
+  { path: '/rooms', label: 'Salles' },
+  { path: '/workshops', label: 'Workshops' },
+  { path: '/staffs', label: 'Staff' },
+  { path: '/students', label: 'Étudiants' },
+  { path: '/incidents', label: 'Incidents' },
+  { path: '/feedback', label: 'Sondages' },
+  { path: '/scan', label: '📷 Scan' },
+]
 
 export function AppHeader() {
   const { pathname } = useLocation()
-  const title = getTitle(pathname)
 
   return (
     <header style={{
@@ -38,7 +28,7 @@ export function AppHeader() {
       justifyContent: 'space-between',
       padding: '0 16px',
       zIndex: 100,
-      background: 'rgba(255,255,255,0.85)',
+      background: 'rgba(255,255,255,0.92)',
       backdropFilter: 'blur(12px)',
       WebkitBackdropFilter: 'blur(12px)',
       borderBottom: '1px solid rgba(0,0,0,0.08)',
@@ -61,7 +51,7 @@ export function AppHeader() {
         textAlign: 'center',
         flex: 1,
       }}>
-        {title}
+        {NAV_ITEMS.find(item => item.path === pathname)?.label || ''}
       </h1>
 
       {/* Right: S4S logo */}

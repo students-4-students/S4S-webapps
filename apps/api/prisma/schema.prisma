@@ -37,6 +37,7 @@ model Section {
   scheduleSlots ScheduleSlot[]
   users         User[]
   Class         Class[]
+  slots         ScheduleSlot[] @relation("ScheduleSlotSections")
 }
 
 model ScheduleSlot {
@@ -46,6 +47,8 @@ model ScheduleSlot {
   startTime   DateTime
   endTime     DateTime
   location    String?
+  roomId      String?
+  room        Room?        @relation(fields: [roomId], references: [id], onDelete: SetNull)
   sectionId   String?
   targetGroup String?      // null = all students, 'A' = Groupe A, 'B' = Groupe B
   type        ScheduleType
@@ -56,6 +59,7 @@ model ScheduleSlot {
   rc          StaffMember? @relation("RcSlots", fields: [rcId], references: [id])
   section     Section?     @relation(fields: [sectionId], references: [id])
   speaker     StaffMember? @relation("SpeakerSlots", fields: [speakerId], references: [id])
+  sections    Section[]    @relation("ScheduleSlotSections")
 }
 
 model StaffMember {
@@ -104,6 +108,8 @@ model Task {
   startTime   DateTime
   endTime     DateTime
   location    String?
+  roomId      String?
+  room        Room?            @relation(fields: [roomId], references: [id], onDelete: SetNull)
   status      TaskStatus       @default(PENDING)
   priority    Priority         @default(MEDIUM)
   createdAt   DateTime         @default(now())
@@ -343,16 +349,53 @@ enum StaffStatus {
 // ─── WORKSHOPS ────────────────────────────────────────────────────────────────
 
 model Workshop {
-  id                   String            @id @default(uuid())
-  title                String
-  location             String
-  description          String
-  image                String?           // image URL or path
-  requiresRegistration Boolean           @default(false)
-  maxParticipants      Int?              // Null means unlimited or not applicable
-  dates                WorkshopSession[]
-  createdAt            DateTime          @default(now())
+  id                      String            @id @default(uuid())
+  title                   String
+  location                String
+  roomId                  String?
+  room                    Room?             @relation("WorkshopRooms", fields: [roomId], references: [id], onDelete: SetNull)
+  description             String
+  image                   String?           // image URL or path
+  requiresRegistration    Boolean           @default(false)
+  externalRegistrationUrl String?           // URL to external registration form (Google Form, etc.)
+  maxParticipants         Int?              // Null means unlimited or not applicable
+  dates                   WorkshopSession[]
+  createdAt               DateTime          @default(now())
 }
+
+// ─── ROOM MANAGEMENT ─────────────────────────────────────────────────────────
+
+model Room {
+  id               String             @id @default(uuid())
+  name             String             @unique
+  building         String?
+  floor            Int?               @default(0)
+  capacity         Int?
+  isComputerRoom   Boolean            @default(false)
+  description      String?
+  latitude         Float?
+  longitude        Float?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  availabilities   RoomAvailability[]
+  scheduleSlots    ScheduleSlot[]
+  workshops        Workshop[]         @relation("WorkshopRooms")
+  workshopSessions WorkshopSession[]  @relation("WorkshopSessionRooms")
+  tasks            Task[]
+}
+
+model RoomAvailability {
+  id        String   @id @default(uuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  date      DateTime
+  startTime DateTime
+  endTime   DateTime
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 
 model WorkshopSession {
   id            String                 @id @default(uuid())
@@ -360,6 +403,9 @@ model WorkshopSession {
   workshop      Workshop               @relation(fields: [workshopId], references: [id], onDelete: Cascade)
   startTime     DateTime
   endTime       DateTime
+  location      String?
+  roomId        String?
+  room          Room?                  @relation("WorkshopSessionRooms", fields: [roomId], references: [id], onDelete: SetNull)
   registrations WorkshopRegistration[]
 }
 

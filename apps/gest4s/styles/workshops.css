@@ -1289,3 +1289,122 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================ */
+/* Room Picker & Slot Conflict Management Styles               */
+/* ============================================================ */
+
+.room-picker-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.room-select-input {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  background: var(--ws-bg-input);
+  border: 1px solid rgba(238, 212, 241, 0.2);
+  border-radius: 0.6rem;
+  color: #ffffff;
+  font-size: 0.9rem;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.room-select-input:focus {
+  border-color: var(--secondary-pink);
+  box-shadow: 0 0 0 3px rgba(255, 102, 179, 0.2);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.room-select-input option {
+  background: #251e38;
+  color: #ffffff;
+}
+
+.slot-room-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.slot-room-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--ws-text-muted);
+}
+
+.slot-conflicts-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+
+.conflict-badge {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.5rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.conflict-badge.error {
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.conflict-badge.warning {
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fcd34d;
+}
+
+.conflict-badge.ok {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #86efac;
+}
+
+.conflict-icon {
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+
+.conflict-text {
+  flex: 1;
+}
+
+.conflicts-summary-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.6rem;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 0.75rem;
+}
+
+.workshop-session-room-tag {
+  font-size: 0.72rem;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.3rem;
+  color: var(--ws-text-muted);
+  margin-left: 0.4rem;
+}
+

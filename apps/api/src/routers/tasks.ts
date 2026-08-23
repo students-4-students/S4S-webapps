@@ -34,6 +34,7 @@ export const tasksRouter = router({
         startTime: z.coerce.date(),
         endTime: z.coerce.date(),
         location: z.string().optional(),
+        roomId: z.string().optional().nullable(),
         status: taskStatusSchema.default('PENDING'),
         priority: prioritySchema.default('MEDIUM'),
         assignedStaffIds: z.array(z.string()).optional(),
