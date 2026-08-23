@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { trpc } from '../trpc'
-import { Modal, Input, Select, Button } from '@s4s/ui'
+import { Modal, Input, Select, Button, MultiSelectCombobox } from '@s4s/ui'
 import StaffCombobox from './StaffCombobox'
 
 const DAYS = [
@@ -18,14 +18,6 @@ const SECTIONS = [
   'CMS', 'POLYSI', 'AR', 'CH', 'EL', 'GC', 'IN', 'MA', 'GM', 'MT', 'MX', 'PH', 'SC', 'SIE', 'SV'
 ]
 
-interface Session {
-  id: string
-  day: string
-  startTime: string
-  endTime: string
-  location: string
-}
-
 interface Props {
   defaultSection: string
   initialData?: any
@@ -39,13 +31,18 @@ function CreateClassModal({ defaultSection, initialData, onClose }: Props) {
   const [type, setType] = useState<'LECTURE' | 'EXERCISE' | 'SPECIAL' | 'MEAL'>(
     initialData?.type || 'LECTURE'
   )
-  const [selectedSections, setSelectedSections] = useState<string[]>([
-    initialData?.section?.name
-      ? initialData.section.name.toUpperCase()
-      : defaultSection && SECTIONS.includes(defaultSection.toUpperCase())
-        ? defaultSection.toUpperCase()
-        : 'CMS',
-  ])
+  const [selectedSections, setSelectedSections] = useState<string[]>(() => {
+    if (initialData?.sections && initialData.sections.length > 0) {
+      return initialData.sections.map((s: any) => s.name.toUpperCase())
+    }
+    if (initialData?.section?.name) {
+      return [initialData.section.name.toUpperCase()]
+    }
+    if (defaultSection && SECTIONS.includes(defaultSection.toUpperCase())) {
+      return [defaultSection.toUpperCase()]
+    }
+    return ['CMS']
+  })
   const [targetGroup, setTargetGroup] = useState<'ALL' | 'A' | 'B'>(
     initialData?.targetGroup || 'ALL'
   )
@@ -60,19 +57,37 @@ function CreateClassModal({ defaultSection, initialData, onClose }: Props) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }
 
-  const [sessions, setSessions] = useState<Session[]>(
-    initialData
-      ? [
-          {
-            id: '1',
-            day: formatYYYYMMDD(initialData.startTime),
-            startTime: formatHHMM(initialData.startTime),
-            endTime: formatHHMM(initialData.endTime),
-            location: initialData.location || '',
-          },
-        ]
-      : [{ id: '1', day: '2026-08-26', startTime: '08:00', endTime: '10:00', location: '' }]
-  )
+  const { data: dbRooms = [] } = trpc.rooms.list.useQuery()
+
+  const [day, setDay] = useState(initialData?.startTime ? formatYYYYMMDD(initialData.startTime) : '2026-08-26')
+  const [startTime, setStartTime] = useState(initialData?.startTime ? formatHHMM(initialData.startTime) : '08:00')
+  const [endTime, setEndTime] = useState(initialData?.endTime ? formatHHMM(initialData.endTime) : '10:00')
+  const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([])
+  const [isRoomsInitialized, setIsRoomsInitialized] = useState(false)
+
+  React.useEffect(() => {
+    if (dbRooms.length > 0 && !isRoomsInitialized && initialData) {
+      const loc = initialData.location || ''
+      const locNames = loc.split(/[,;/]+/).map((s: string) => s.trim().toUpperCase()).filter(Boolean)
+
+      let matched: string[] = []
+      if (locNames.length > 0) {
+        matched = dbRooms
+          .filter((r: any) => {
+            const rName = r.name.trim().toUpperCase()
+            return locNames.includes(rName) || locNames.some((l: string) => l === rName || l.includes(rName) || rName.includes(l))
+          })
+          .map((r: any) => r.id)
+      }
+
+      if (matched.length === 0 && initialData.roomId) {
+        matched = [initialData.roomId]
+      }
+
+      setSelectedRoomIds(matched)
+      setIsRoomsInitialized(true)
+    }
+  }, [dbRooms, initialData, isRoomsInitialized])
 
   const [speakerId, setSpeakerId] = useState<string>(
     initialData?.speakerId || initialData?.speaker?.id || ''
@@ -82,47 +97,23 @@ function CreateClassModal({ defaultSection, initialData, onClose }: Props) {
   )
   const [rcId, setRcId] = useState<string>(initialData?.rcId || initialData?.rc?.id || '')
 
-  const firstSession = sessions[0]
+  const matchedRooms = dbRooms.filter((r: any) => selectedRoomIds.includes(r.id))
+  const locationString = matchedRooms.length > 0 ? matchedRooms.map((r: any) => r.name).join(', ') : undefined
+
   const conflictQuery = trpc.schedules.checkConflicts.useQuery(
     {
-      startTime: new Date(`${firstSession?.day}T${firstSession?.startTime}:00`),
-      endTime: new Date(`${firstSession?.day}T${firstSession?.endTime}:00`),
-      location: firstSession?.location || undefined,
-      sectionId: selectedSections[0] || undefined,
+      startTime: new Date(`${day}T${startTime}:00`),
+      endTime: new Date(`${day}T${endTime}:00`),
+      sectionIds: selectedSections,
+      location: locationString,
     },
     {
-      enabled: Boolean(firstSession?.day && firstSession?.startTime && firstSession?.endTime),
+      enabled: Boolean(day && startTime && endTime),
     }
   )
   const conflicts = conflictQuery.data || []
 
-  const { data: staffs = [] } = trpc.staffs.list.useQuery()
   const createMutation = trpc.schedules.create.useMutation()
-
-  const addSession = () => {
-    const lastSession = sessions[sessions.length - 1]
-    const newId = String(Date.now() + Math.random())
-    setSessions([
-      ...sessions,
-      {
-        id: newId,
-        day: lastSession ? lastSession.day : '2026-08-26',
-        startTime: lastSession ? lastSession.startTime : '08:00',
-        endTime: lastSession ? lastSession.endTime : '10:00',
-        location: lastSession ? lastSession.location : ''
-      }
-    ])
-  }
-
-  const removeSession = (id: string) => {
-    if (sessions.length > 1) {
-      setSessions(sessions.filter((s) => s.id !== id))
-    }
-  }
-
-  const updateSession = (id: string, field: keyof Session, value: string) => {
-    setSessions(sessions.map((s) => (s.id === id ? { ...s, [field]: value } : s)))
-  }
 
   const toggleSection = (sec: string) => {
     if (selectedSections.includes(sec)) {
@@ -153,29 +144,24 @@ function CreateClassModal({ defaultSection, initialData, onClose }: Props) {
     }
 
     try {
-      const promises = []
-      for (const sec of selectedSections) {
-        for (const sess of sessions) {
-          const startStr = `${sess.day}T${sess.startTime}:00`
-          const endStr = `${sess.day}T${sess.endTime}:00`
+      const startStr = `${day}T${startTime}:00`
+      const endStr = `${day}T${endTime}:00`
 
-          promises.push(
-            createMutation.mutateAsync({
-              title,
-              type,
-              startTime: new Date(startStr),
-              endTime: new Date(endStr),
-              location: sess.location || undefined,
-              sectionId: sec,
-              targetGroup: targetGroup === 'ALL' ? undefined : targetGroup,
-              speakerId: speakerId || undefined,
-              assistantId: assistantId || undefined,
-              rcId: rcId || undefined,
-            })
-          )
-        }
-      }
-      await Promise.all(promises)
+      await createMutation.mutateAsync({
+        title,
+        type,
+        startTime: new Date(startStr),
+        endTime: new Date(endStr),
+        location: locationString,
+        roomId: selectedRoomIds[0] || undefined,
+        sectionId: selectedSections[0] || undefined,
+        sectionIds: selectedSections,
+        targetGroup: targetGroup === 'ALL' ? undefined : targetGroup,
+        speakerId: speakerId || undefined,
+        assistantId: assistantId || undefined,
+        rcId: rcId || undefined,
+      })
+
       utils.schedules.list.invalidate()
       onClose()
     } catch (error) {
@@ -254,6 +240,25 @@ function CreateClassModal({ defaultSection, initialData, onClose }: Props) {
           />
         </div>
 
+        {/* Multi-Select Rooms Component */}
+        <div style={{ marginBottom: '1rem' }}>
+          <MultiSelectCombobox
+            label="Locaux / Salles (Sélection multiple)"
+            placeholder="Rechercher et sélectionner des locaux (ex: BC 410, CO 1)..."
+            options={dbRooms.map((r: any) => ({
+              id: r.id,
+              label: r.name,
+              sublabel: r.building ? `Bâtiment ${r.building}` : undefined,
+              category: r.building ? r.building.toUpperCase() : undefined,
+            }))}
+            selectedIds={selectedRoomIds}
+            onChange={setSelectedRoomIds}
+            categories={Array.from(
+              new Set(dbRooms.map((r: any) => r.building?.toUpperCase()).filter(Boolean) as string[])
+            )}
+          />
+        </div>
+
         <div style={{ marginBottom: '1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
             <label className="s4s-label">Sections * (Sélectionnez au moins une)</label>
@@ -320,87 +325,53 @@ function CreateClassModal({ defaultSection, initialData, onClose }: Props) {
           </div>
         </div>
 
-        <div style={{ marginBottom: '1rem' }}>
-          <label className="s4s-label">Sessions *</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.375rem' }}>
-            {sessions.map((sess) => (
-              <div
-                key={sess.id}
-                style={{
-                  display: 'flex',
-                  gap: '0.4rem',
-                  alignItems: 'center',
-                  padding: '0.5rem',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  borderRadius: 'var(--s4s-radius-md)',
-                  border: '1px solid rgba(238, 212, 241, 0.15)'
-                }}
-              >
-                <select
-                  className="s4s-select"
-                  style={{ flex: 1.5, padding: '0.3rem' }}
-                  value={sess.day}
-                  onChange={(e) => updateSession(sess.id, 'day', e.target.value)}
-                >
-                  {DAYS.map((d) => (
-                    <option key={d.dateStr} value={d.dateStr}>
-                      {d.label}
-                    </option>
-                  ))}
-                </select>
-
-                <input
-                  type="time"
-                  required
-                  className="s4s-input"
-                  style={{ flex: 1, padding: '0.3rem', minWidth: '65px' }}
-                  value={sess.startTime}
-                  onChange={(e) => updateSession(sess.id, 'startTime', e.target.value)}
-                />
-
-                <span style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.7)' }}>à</span>
-
-                <input
-                  type="time"
-                  required
-                  className="s4s-input"
-                  style={{ flex: 1, padding: '0.3rem', minWidth: '65px' }}
-                  value={sess.endTime}
-                  onChange={(e) => updateSession(sess.id, 'endTime', e.target.value)}
-                />
-
-                <input
-                  type="text"
-                  placeholder="Salle (ex: CO2)"
-                  className="s4s-input"
-                  style={{ flex: 1.2, padding: '0.3rem', minWidth: '80px' }}
-                  value={sess.location}
-                  onChange={(e) => updateSession(sess.id, 'location', e.target.value)}
-                />
-
-                {sessions.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="danger"
-                    size="sm"
-                    onClick={() => removeSession(sess.id)}
-                    style={{ padding: '0.3rem 0.5rem', minWidth: 'auto', height: 'auto' }}
-                  >
-                    🗑️
-                  </Button>
-                )}
-              </div>
-            ))}
-
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={addSession}
-              style={{ marginTop: '0.2rem' }}
+        {/* Single Session Date & Time */}
+        <div style={{ marginBottom: '1.25rem' }}>
+          <label className="s4s-label">Horaire (Jour & Heures) *</label>
+          <div
+            style={{
+              display: 'flex',
+              gap: '0.6rem',
+              alignItems: 'center',
+              padding: '0.6rem 0.75rem',
+              background: 'rgba(255, 255, 255, 0.05)',
+              borderRadius: 'var(--s4s-radius-md)',
+              border: '1px solid rgba(238, 212, 241, 0.15)',
+              marginTop: '0.35rem',
+            }}
+          >
+            <select
+              className="s4s-select"
+              style={{ flex: 1.5, padding: '0.4rem' }}
+              value={day}
+              onChange={(e) => setDay(e.target.value)}
             >
-              + Ajouter une session
-            </Button>
+              {DAYS.map((d) => (
+                <option key={d.dateStr} value={d.dateStr}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="time"
+              required
+              className="s4s-input"
+              style={{ flex: 1, padding: '0.4rem', minWidth: '85px' }}
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+            />
+
+            <span style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.7)' }}>à</span>
+
+            <input
+              type="time"
+              required
+              className="s4s-input"
+              style={{ flex: 1, padding: '0.4rem', minWidth: '85px' }}
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+            />
           </div>
         </div>
 

@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Link } from '@tanstack/react-router'
 import { trpc } from '../trpc'
 import {
   formatDateTimeRange,
@@ -12,15 +11,30 @@ interface WorkshopSession {
   id: string
   startTime: Date | string
   endTime: Date | string
+  roomId?: string | null
+  location?: string | null
+  room?: {
+    id: string
+    name: string
+    building?: string | null
+  } | null
+  registrations?: any[]
 }
 
 interface Workshop {
   id: string
   title: string
   location: string
+  roomId?: string | null
+  room?: {
+    id: string
+    name: string
+    building?: string | null
+  } | null
   description: string
   image: string | null
   requiresRegistration: boolean
+  externalRegistrationUrl?: string | null
   maxParticipants: number | null
   dates: WorkshopSession[]
 }
@@ -35,8 +49,6 @@ interface Participant {
   sessionTime?: string
   isPresent: boolean
 }
-
-
 
 export default function Workshops() {
   const [showModal, setShowModal] = useState(false)
@@ -53,12 +65,21 @@ export default function Workshops() {
 
   // Form State
   const [title, setTitle] = useState('')
+  const [selectedRoomId, setSelectedRoomId] = useState<string>('')
+  const [customLocation, setCustomLocation] = useState<string>('')
   const [location, setLocation] = useState('')
   const [description, setDescription] = useState('')
   const [image, setImage] = useState('')
   const [requiresRegistration, setRequiresRegistration] = useState(false)
+  const [externalRegistrationUrl, setExternalRegistrationUrl] = useState('')
   const [maxParticipants, setMaxParticipants] = useState<number | ''>('')
-  const [dates, setDates] = useState<{ startTime: string; endTime: string }[]>([])
+  const [dates, setDates] = useState<{
+    startTime: string
+    endTime: string
+    roomId?: string
+    location?: string
+    customLocation?: string
+  }[]>([])
 
   // Participants Modal State
   const [usersModalWorkshop, setUsersModalWorkshop] = useState<Workshop | null>(null)
@@ -92,6 +113,7 @@ export default function Workshops() {
 
   // Queries & Mutations
   const { data: workshops = [], isLoading } = trpc.workshops.list.useQuery()
+  const { data: dbRooms = [] } = trpc.rooms.list.useQuery()
   const { data: dbStudents = [] } = trpc.students.list.useQuery(undefined, {
     retry: false,
     staleTime: 60000,
@@ -108,7 +130,6 @@ export default function Workshops() {
   }, [dbStudents, studentSearchQuery])
 
   const getWorkshopParticipants = (workshop: Workshop): Participant[] => {
-    // Read real DB registrations returned from the workshops router
     const dbRegistrations: Participant[] = (workshop.dates || []).flatMap((d: any) =>
       (d.registrations || []).map((r: any) => ({
         id: r.id,
@@ -122,7 +143,6 @@ export default function Workshops() {
       }))
     )
 
-    // If staff added manual participants in React state, combine them
     const localList = participantsMap[workshop.id] || []
     const combinedMap = new Map<string, Participant>()
 
@@ -229,6 +249,69 @@ export default function Workshops() {
     }
   })
 
+  // Real-time Conflict Query for the open modal slots
+  const slotsForConflictCheck = useMemo(() => {
+    if (!showModal) return []
+    return dates.map(d => {
+      let effectiveRoomId: string | null = null
+      let effectiveLocation: string | null = null
+
+      if (d.roomId === '__CUSTOM__') {
+        effectiveRoomId = null
+        effectiveLocation = d.customLocation || d.location || null
+      } else if (d.roomId) {
+        effectiveRoomId = d.roomId
+        const r = dbRooms.find((room: any) => room.id === d.roomId)
+        effectiveLocation = r?.name || null
+      } else {
+        if (selectedRoomId === '__CUSTOM__') {
+          effectiveRoomId = null
+          effectiveLocation = customLocation || location || null
+        } else if (selectedRoomId) {
+          effectiveRoomId = selectedRoomId
+          const r = dbRooms.find((room: any) => room.id === selectedRoomId)
+          effectiveLocation = r?.name || null
+        } else {
+          effectiveRoomId = null
+          effectiveLocation = location || null
+        }
+      }
+
+      return {
+        startTime: d.startTime,
+        endTime: d.endTime,
+        roomId: effectiveRoomId,
+        location: effectiveLocation,
+      }
+    })
+  }, [showModal, dates, selectedRoomId, customLocation, location, dbRooms])
+
+  const validSlotsForCheck = useMemo(() => {
+    return slotsForConflictCheck
+      .filter(s => s.startTime && s.endTime && !isNaN(new Date(s.startTime).getTime()) && !isNaN(new Date(s.endTime).getTime()))
+      .map(s => ({
+        startTime: new Date(s.startTime),
+        endTime: new Date(s.endTime),
+        roomId: s.roomId,
+        location: s.location,
+      }))
+  }, [slotsForConflictCheck])
+
+  const { data: slotConflicts = [] } = trpc.workshops.checkConflicts.useQuery(
+    {
+      workshopId: editingWorkshop?.id,
+      slots: validSlotsForCheck,
+    },
+    {
+      enabled: showModal && validSlotsForCheck.length > 0,
+      refetchInterval: 8000,
+    }
+  )
+
+  const hasConflictErrors = useMemo(() => {
+    return slotConflicts.some((c: any) => c.severity === 'ERROR')
+  }, [slotConflicts])
+
   // Keyboard shortcut (Escape to close modal)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -244,19 +327,24 @@ export default function Workshops() {
   const openCreateModal = () => {
     setEditingWorkshop(null)
     setTitle('')
+    setSelectedRoomId('')
+    setCustomLocation('')
     setLocation('')
     setDescription('')
     setImage('')
     setImageTab('file')
     setRequiresRegistration(false)
+    setExternalRegistrationUrl('')
     setMaxParticipants('')
     
-    // Pre-populate with current local date/time, and end time in 2 hours
     const now = new Date()
     const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000)
     setDates([{ 
       startTime: toLocalDatetimeString(now), 
-      endTime: toLocalDatetimeString(twoHoursLater) 
+      endTime: toLocalDatetimeString(twoHoursLater),
+      roomId: '',
+      location: '',
+      customLocation: '',
     }])
     
     setShowModal(true)
@@ -265,11 +353,30 @@ export default function Workshops() {
   const openEditModal = (w: Workshop) => {
     setEditingWorkshop(w)
     setTitle(w.title)
-    setLocation(w.location)
+    
+    // Resolve workshop room
+    let initialRoomId = ''
+    let initialCustom = ''
+    if (w.roomId && dbRooms.some((r: any) => r.id === w.roomId)) {
+      initialRoomId = w.roomId
+    } else {
+      const match = dbRooms.find((r: any) => r.name.toLowerCase() === w.location?.trim().toLowerCase())
+      if (match) {
+        initialRoomId = match.id
+      } else if (w.location) {
+        initialRoomId = '__CUSTOM__'
+        initialCustom = w.location
+      }
+    }
+    setSelectedRoomId(initialRoomId)
+    setCustomLocation(initialCustom)
+    setLocation(w.location || '')
+
     setDescription(w.description)
     setImage(w.image || '')
     setImageTab(w.image && !w.image.startsWith('data:') ? 'url' : 'file')
     setRequiresRegistration(w.requiresRegistration)
+    setExternalRegistrationUrl(w.externalRegistrationUrl || '')
     setMaxParticipants(w.maxParticipants ?? '')
     
     const sortedDates = [...(w.dates || [])].sort(
@@ -277,10 +384,28 @@ export default function Workshops() {
     )
 
     setDates(
-      sortedDates.map(d => ({
-        startTime: toLocalDatetimeString(d.startTime),
-        endTime: toLocalDatetimeString(d.endTime)
-      }))
+      sortedDates.map(d => {
+        let dRoomId = ''
+        let dCustom = ''
+        if (d.roomId && dbRooms.some((r: any) => r.id === d.roomId)) {
+          dRoomId = d.roomId
+        } else if (d.location) {
+          const match = dbRooms.find((r: any) => r.name.toLowerCase() === d.location?.trim().toLowerCase())
+          if (match) {
+            dRoomId = match.id
+          } else {
+            dRoomId = '__CUSTOM__'
+            dCustom = d.location
+          }
+        }
+        return {
+          startTime: toLocalDatetimeString(d.startTime),
+          endTime: toLocalDatetimeString(d.endTime),
+          roomId: dRoomId,
+          location: d.location || '',
+          customLocation: dCustom,
+        }
+      })
     )
     setShowModal(true)
   }
@@ -350,18 +475,57 @@ export default function Workshops() {
       }
     }
     
-    setDates([...dates, { startTime: startStr, endTime: endStr }])
+    setDates([...dates, { startTime: startStr, endTime: endStr, roomId: '', location: '', customLocation: '' }])
   }
 
   const handleRemoveDate = (index: number) => {
     setDates(dates.filter((_, i) => i !== index))
   }
 
-  const handleDateChange = (index: number, field: 'startTime' | 'endTime', val: string) => {
+  const handleDateChange = (index: number, field: string, val: string) => {
     const updated = [...dates]
     updated[index] = {
       ...updated[index],
       [field]: val
+    }
+    setDates(updated)
+  }
+
+  const handleMainRoomChange = (roomIdVal: string) => {
+    setSelectedRoomId(roomIdVal)
+    if (roomIdVal === '__CUSTOM__') {
+      setLocation(customLocation)
+    } else if (roomIdVal) {
+      const found = dbRooms.find((r: any) => r.id === roomIdVal)
+      if (found) {
+        setLocation(found.name)
+      }
+    } else {
+      setLocation('')
+    }
+  }
+
+  const handleSlotRoomChange = (index: number, val: string) => {
+    const updated = [...dates]
+    if (val === '__CUSTOM__') {
+      updated[index] = {
+        ...updated[index],
+        roomId: '__CUSTOM__',
+        location: updated[index].customLocation || '',
+      }
+    } else if (val) {
+      const found = dbRooms.find((r: any) => r.id === val)
+      updated[index] = {
+        ...updated[index],
+        roomId: val,
+        location: found?.name || '',
+      }
+    } else {
+      updated[index] = {
+        ...updated[index],
+        roomId: '',
+        location: '',
+      }
     }
     setDates(updated)
   }
@@ -371,6 +535,24 @@ export default function Workshops() {
 
     if (dates.length === 0) {
       alert("Veuillez ajouter au moins une session pour le workshop.")
+      return
+    }
+
+    // Determine final workshop location string
+    let finalLocation = location.trim()
+    let finalRoomId: string | null = null
+
+    if (selectedRoomId === '__CUSTOM__') {
+      finalLocation = customLocation.trim()
+      finalRoomId = null
+    } else if (selectedRoomId) {
+      const r = dbRooms.find((room: any) => room.id === selectedRoomId)
+      finalLocation = r?.name || location.trim()
+      finalRoomId = selectedRoomId
+    }
+
+    if (!finalLocation) {
+      alert("Veuillez renseigner un lieu ou sélectionner une salle pour le workshop.")
       return
     }
 
@@ -394,15 +576,33 @@ export default function Workshops() {
 
     const payload = {
       title: title.trim(),
-      location: location.trim(),
+      location: finalLocation,
+      roomId: finalRoomId,
       description: description.trim(),
       image: image.trim() || undefined,
       requiresRegistration,
-      maxParticipants: requiresRegistration && maxParticipants !== '' ? Number(maxParticipants) : null,
-      dates: dates.map(d => ({
-        startTime: toISOStringFromLocal(d.startTime),
-        endTime: toISOStringFromLocal(d.endTime)
-      }))
+      externalRegistrationUrl: requiresRegistration && externalRegistrationUrl.trim() ? externalRegistrationUrl.trim() : null,
+      maxParticipants: requiresRegistration && !externalRegistrationUrl.trim() && maxParticipants !== '' ? Number(maxParticipants) : null,
+      dates: dates.map(d => {
+        let slotRoomId: string | null = null
+        let slotLocation: string | null = null
+
+        if (d.roomId === '__CUSTOM__') {
+          slotRoomId = null
+          slotLocation = d.customLocation?.trim() || d.location?.trim() || null
+        } else if (d.roomId) {
+          slotRoomId = d.roomId
+          const r = dbRooms.find((room: any) => room.id === d.roomId)
+          slotLocation = r?.name || null
+        }
+
+        return {
+          startTime: toISOStringFromLocal(d.startTime),
+          endTime: toISOStringFromLocal(d.endTime),
+          roomId: slotRoomId,
+          location: slotLocation,
+        }
+      })
     }
 
     if (editingWorkshop) {
@@ -425,21 +625,19 @@ export default function Workshops() {
   const filteredWorkshops = useMemo(() => {
     const now = new Date().getTime()
 
-    return workshops.filter(w => {
-      // Search filter
+    return workshops.filter((w: Workshop) => {
       const matchesSearch = 
         !searchQuery ||
         w.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         w.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (w.room?.name && w.room.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
         w.description.toLowerCase().includes(searchQuery.toLowerCase())
 
-      // Registration filter
       const matchesReg = 
         registrationFilter === 'all' ||
         (registrationFilter === 'required' && w.requiresRegistration) ||
         (registrationFilter === 'open' && !w.requiresRegistration)
 
-      // Time filter (upcoming vs past)
       let matchesTime = true
       if (timeFilter !== 'all') {
         const hasUpcomingSession = w.dates.some(d => new Date(d.endTime).getTime() > now)
@@ -475,6 +673,15 @@ export default function Workshops() {
     })
   }, [currentWorkshopParticipants, usersSearchQuery, usersSessionFilter])
 
+  const effectiveWorkshopLocationName = useMemo(() => {
+    if (selectedRoomId === '__CUSTOM__') return customLocation || 'Lieu personnalisé'
+    if (selectedRoomId) {
+      const r = dbRooms.find((room: any) => room.id === selectedRoomId)
+      return r?.name || location || 'Salle sélectionnée'
+    }
+    return location || 'Non défini'
+  }, [selectedRoomId, customLocation, location, dbRooms])
+
   return (
     <div className="workshops-page">
       {/* Search & Filter Toolbar */}
@@ -483,7 +690,7 @@ export default function Workshops() {
           <span className="search-icon">🔍</span>
           <input
             type="text"
-            placeholder="Rechercher par titre, lieu, description..."
+            placeholder="Rechercher par titre, salle, lieu, description..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -575,6 +782,7 @@ export default function Workshops() {
                 (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
               )
               const participantsList = getWorkshopParticipants(w)
+              const displayLocation = w.room?.name || w.location
 
               return (
                 <div key={w.id} className="workshop-card">
@@ -595,9 +803,22 @@ export default function Workshops() {
                     )}
                     <div className="workshop-badge-row">
                       {w.requiresRegistration ? (
-                        <span className="badge badge-registration">
-                          📝 Inscription requise {w.maxParticipants ? `(${w.maxParticipants} max)` : ''}
-                        </span>
+                        w.externalRegistrationUrl ? (
+                          <a
+                            href={w.externalRegistrationUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="badge badge-registration"
+                            style={{ textDecoration: 'none', background: 'rgba(37, 99, 235, 0.15)', color: '#2563eb', border: '1px solid rgba(37, 99, 235, 0.3)' }}
+                            title="Ouvrir le formulaire externe"
+                          >
+                            🔗 Formulaire externe ↗
+                          </a>
+                        ) : (
+                          <span className="badge badge-registration">
+                            📝 Inscription requise {w.maxParticipants ? `(${w.maxParticipants} max)` : ''}
+                          </span>
+                        )
                       ) : (
                         <span className="badge badge-open">
                           🟢 Entrée libre
@@ -610,7 +831,12 @@ export default function Workshops() {
                     <h2 className="workshop-title">{w.title}</h2>
                     
                     <div className="workshop-location">
-                      📍 <span>{w.location}</span>
+                      📍 <span>{displayLocation}</span>
+                      {w.room?.building && (
+                        <span style={{ opacity: 0.7, fontSize: '0.85em', marginLeft: '0.35rem' }}>
+                          ({w.room.building})
+                        </span>
+                      )}
                     </div>
 
                     <p className="workshop-description">{w.description}</p>
@@ -623,11 +849,21 @@ export default function Workshops() {
                         {sortedDates.length === 0 ? (
                           <span className="no-sessions">Aucune session définie</span>
                         ) : (
-                          sortedDates.map((d) => (
-                            <div key={d.id} className="workshop-date-chip">
-                              📅 {formatDateTimeRange(d.startTime, d.endTime)}
-                            </div>
-                          ))
+                          sortedDates.map((d: any) => {
+                            const slotLoc = d.room?.name || d.location
+                            const hasCustomRoom = slotLoc && slotLoc !== displayLocation
+
+                            return (
+                              <div key={d.id} className="workshop-date-chip">
+                                📅 {formatDateTimeRange(d.startTime, d.endTime)}
+                                {hasCustomRoom && (
+                                  <span className="workshop-session-room-tag">
+                                    📍 {slotLoc}
+                                  </span>
+                                )}
+                              </div>
+                            )
+                          })
                         )}
                       </div>
                     </div>
@@ -663,7 +899,6 @@ export default function Workshops() {
         )}
       </div>
 
-
       {/* Create / Edit Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={closeModal}>
@@ -677,6 +912,13 @@ export default function Workshops() {
             </div>
 
             <form onSubmit={handleSubmit}>
+              {hasConflictErrors && (
+                <div className="conflicts-summary-banner">
+                  <span>⚠️</span>
+                  <span>Des conflits d'occupation de salle ont été détectés sur une ou plusieurs sessions. Veuillez vérifier les détails ci-dessous.</span>
+                </div>
+              )}
+
               <label>
                 Titre du workshop *
                 <input
@@ -688,16 +930,48 @@ export default function Workshops() {
                 />
               </label>
 
-              <label>
-                Lieu *
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex: Salle BC 420"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                />
-              </label>
+              {/* Room Picker Section */}
+              <div className="form-group-full">
+                <label className="field-label">
+                  Salle principale du workshop (par défaut pour les sessions) *
+                </label>
+                <div className="room-picker-container">
+                  <select
+                    className="room-select-input"
+                    value={selectedRoomId}
+                    onChange={(e) => handleMainRoomChange(e.target.value)}
+                  >
+                    <option value="">-- Choisir une salle de la base de données --</option>
+                    {dbRooms.map((r: any) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name} {r.building ? `(${r.building})` : ''} {r.capacity ? `• Capacité: ${r.capacity}` : ''} {r.isComputerRoom ? '• [Info]' : ''}
+                      </option>
+                    ))}
+                    <option value="__CUSTOM__">✍️ Autre salle / Lieu personnalisé...</option>
+                  </select>
+
+                  {selectedRoomId === '__CUSTOM__' && (
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Rolex Learning Center, Forum RLC, etc."
+                      value={customLocation}
+                      onChange={(e) => {
+                        setCustomLocation(e.target.value)
+                        setLocation(e.target.value)
+                      }}
+                      className="custom-location-input"
+                      style={{
+                        padding: '0.6rem 0.8rem',
+                        background: 'var(--ws-bg-input)',
+                        border: '1px solid rgba(238, 212, 241, 0.2)',
+                        borderRadius: '0.6rem',
+                        color: '#ffffff',
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
 
               <label>
                 Description *
@@ -719,23 +993,43 @@ export default function Workshops() {
                     checked={requiresRegistration}
                     onChange={(e) => {
                       setRequiresRegistration(e.target.checked)
-                      if (!e.target.checked) setMaxParticipants('')
+                      if (!e.target.checked) {
+                        setMaxParticipants('')
+                        setExternalRegistrationUrl('')
+                      }
                     }}
                   />
                   <span>Requiert une inscription préalable</span>
                 </label>
 
                 {requiresRegistration && (
-                  <label className="sub-label">
-                    Nombre maximal de participants (laisser vide si illimité)
-                    <input
-                      type="number"
-                      min={1}
-                      placeholder="Ex: 25"
-                      value={maxParticipants}
-                      onChange={(e) => setMaxParticipants(e.target.value !== '' ? Number(e.target.value) : '')}
-                    />
-                  </label>
+                  <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <label className="sub-label">
+                      Lien vers un formulaire externe (Google Forms, Typeform, etc.)
+                      <input
+                        type="url"
+                        placeholder="https://forms.gle/... (laisser vide pour inscription sur l'app)"
+                        value={externalRegistrationUrl}
+                        onChange={(e) => setExternalRegistrationUrl(e.target.value)}
+                      />
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem', display: 'block' }}>
+                        Si renseigné, le bouton d'inscription dans l'application renverra directement vers ce formulaire externe.
+                      </span>
+                    </label>
+
+                    {!externalRegistrationUrl && (
+                      <label className="sub-label">
+                        Nombre maximal de participants sur l'application (laisser vide si illimité)
+                        <input
+                          type="number"
+                          min={1}
+                          placeholder="Ex: 25"
+                          value={maxParticipants}
+                          onChange={(e) => setMaxParticipants(e.target.value !== '' ? Number(e.target.value) : '')}
+                        />
+                      </label>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -819,44 +1113,129 @@ export default function Workshops() {
                 </div>
 
                 <div className="dates-list-container">
-                  {dates.map((d, index) => (
-                    <div key={index} className="date-input-card">
-                      <div className="date-input-header">
-                        <span className="session-index-badge">Session #{index + 1}</span>
-                        {dates.length > 1 && (
-                          <button
-                            type="button"
-                            className="btn-remove-date"
-                            onClick={() => handleRemoveDate(index)}
+                  {dates.map((d, index) => {
+                    const currentSlotConflicts = slotConflicts.filter((c: any) => c.slotIndex === index)
+                    const hasErrors = currentSlotConflicts.some((c: any) => c.severity === 'ERROR')
+                    const hasWarnings = currentSlotConflicts.some((c: any) => c.severity === 'WARNING')
+
+                    const assignedRoomOrLoc = d.roomId === '__CUSTOM__'
+                      ? (d.customLocation || 'Lieu personnalisé')
+                      : (d.roomId ? (dbRooms.find((r: any) => r.id === d.roomId)?.name || 'Salle') : effectiveWorkshopLocationName)
+
+                    return (
+                      <div key={index} className="date-input-card">
+                        <div className="date-input-header">
+                          <span className="session-index-badge">Session #{index + 1}</span>
+                          {dates.length > 1 && (
+                            <button
+                              type="button"
+                              className="btn-remove-date"
+                              onClick={() => handleRemoveDate(index)}
+                            >
+                              Supprimer
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="date-input-fields">
+                          <label>
+                            Début
+                            <input
+                              type="datetime-local"
+                              required
+                              value={d.startTime}
+                              onChange={(e) => handleDateChange(index, 'startTime', e.target.value)}
+                            />
+                          </label>
+
+                          <label>
+                            Fin
+                            <input
+                              type="datetime-local"
+                              required
+                              value={d.endTime}
+                              onChange={(e) => handleDateChange(index, 'endTime', e.target.value)}
+                            />
+                          </label>
+                        </div>
+
+                        {/* Per-Slot Room Picker */}
+                        <div className="slot-room-row">
+                          <div className="slot-room-header">
+                            <span>Salle spécifique pour cette session :</span>
+                          </div>
+                          <select
+                            className="room-select-input"
+                            value={d.roomId || ''}
+                            onChange={(e) => handleSlotRoomChange(index, e.target.value)}
+                            style={{ fontSize: '0.82rem', padding: '0.45rem 0.65rem' }}
                           >
-                            Supprimer
-                          </button>
-                        )}
-                      </div>
+                            <option value="">
+                              Même salle que le workshop ({effectiveWorkshopLocationName})
+                            </option>
+                            {dbRooms.map((r: any) => (
+                              <option key={r.id} value={r.id}>
+                                {r.name} {r.building ? `(${r.building})` : ''} {r.capacity ? `• Capacité: ${r.capacity}` : ''}
+                              </option>
+                            ))}
+                            <option value="__CUSTOM__">✍️ Autre salle spécifique...</option>
+                          </select>
 
-                      <div className="date-input-fields">
-                        <label>
-                          Début
-                          <input
-                            type="datetime-local"
-                            required
-                            value={d.startTime}
-                            onChange={(e) => handleDateChange(index, 'startTime', e.target.value)}
-                          />
-                        </label>
+                          {d.roomId === '__CUSTOM__' && (
+                            <input
+                              type="text"
+                              placeholder="Ex: Salle SG 123"
+                              value={d.customLocation || ''}
+                              onChange={(e) => {
+                                const updated = [...dates]
+                                updated[index] = {
+                                  ...updated[index],
+                                  customLocation: e.target.value,
+                                  location: e.target.value,
+                                }
+                                setDates(updated)
+                              }}
+                              style={{
+                                padding: '0.45rem 0.65rem',
+                                background: 'var(--ws-bg-input)',
+                                border: '1px solid rgba(238, 212, 241, 0.2)',
+                                borderRadius: '0.45rem',
+                                color: '#ffffff',
+                                fontSize: '0.82rem',
+                                marginTop: '0.25rem',
+                              }}
+                            />
+                          )}
+                        </div>
 
-                        <label>
-                          Fin
-                          <input
-                            type="datetime-local"
-                            required
-                            value={d.endTime}
-                            onChange={(e) => handleDateChange(index, 'endTime', e.target.value)}
-                          />
-                        </label>
+                        {/* Real-time Conflict Indicators */}
+                        {currentSlotConflicts.length > 0 ? (
+                          <div className="slot-conflicts-container">
+                            {currentSlotConflicts.map((conf: any, cIdx: number) => (
+                              <div
+                                key={cIdx}
+                                className={`conflict-badge ${conf.severity === 'ERROR' ? 'error' : 'warning'}`}
+                              >
+                                <span className="conflict-icon">
+                                  {conf.severity === 'ERROR' ? '🚫' : '⚠️'}
+                                </span>
+                                <span className="conflict-text">{conf.message}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : assignedRoomOrLoc && assignedRoomOrLoc !== 'Non défini' && d.startTime && d.endTime ? (
+                          <div className="slot-conflicts-container">
+                            <div className="conflict-badge ok">
+                              <span className="conflict-icon">✓</span>
+                              <span className="conflict-text">
+                                Salle {assignedRoomOrLoc} disponible sur ce créneau (aucun conflit détecté)
+                              </span>
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
 

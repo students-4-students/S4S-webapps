@@ -5,6 +5,7 @@ import CreateClassModal from '../components/CreateClassModal'
 import EditClassModal from '../components/EditClassModal'
 import CreateShiftModal from '../components/CreateShiftModal'
 import EditShiftModal from '../components/EditShiftModal'
+import ImportScheduleModal from '../components/ImportScheduleModal'
 import '../../styles/schedule.css'
 import '../../styles/dashboard.css'
 
@@ -51,6 +52,8 @@ function Schedule() {
   const [isAutocompleteFocused, setIsAutocompleteFocused] = useState<boolean>(false)
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false)
   const [showCreateShiftModal, setShowCreateShiftModal] = useState<boolean>(false)
+  const [showImportModal, setShowImportModal] = useState<boolean>(false)
+  const [showExportMenu, setShowExportMenu] = useState<boolean>(false)
   const [selectedSlotForEdit, setSelectedSlotForEdit] = useState<any | null>(null)
   const [selectedShiftForEdit, setSelectedShiftForEdit] = useState<any | null>(null)
   const [duplicateInitialData, setDuplicateInitialData] = useState<any | null>(null)
@@ -340,7 +343,14 @@ function Schedule() {
       if (getSlotDateStr(slot.startTime) !== dateStr) return false
 
       if (viewType === 'section') {
-        return slot.section?.name?.toUpperCase() === activeEntityId.toUpperCase()
+        const slotSectionNames = [
+          slot.section?.name,
+          ...(slot.sections || []).map((s: any) => s.name),
+        ]
+          .filter(Boolean)
+          .map((n: string) => n.toUpperCase())
+
+        return slotSectionNames.includes(activeEntityId.toUpperCase())
       } else if (viewType === 'location') {
         if (activeEntityId === 'none') {
           return !slot.location
@@ -377,6 +387,129 @@ function Schedule() {
     }
 
     return filtered.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+  }
+
+  const handleExportJSON = () => {
+    if (!safeSlots || safeSlots.length === 0) {
+      alert('Aucun créneau à exporter.')
+      return
+    }
+
+    const exportData = safeSlots.map((slot) => {
+      const sectionNames = [
+        slot.section?.name,
+        ...(slot.sections || []).map((s: any) => s.name),
+      ].filter(Boolean)
+
+      const uniqueSectionNames = Array.from(new Set(sectionNames))
+
+      const speakerName = slot.speaker
+        ? `${slot.speaker.firstName} ${slot.speaker.lastName}`.trim()
+        : null
+      const assistantName = slot.assistant
+        ? `${slot.assistant.firstName} ${slot.assistant.lastName}`.trim()
+        : null
+      const rcName = slot.rc
+        ? `${slot.rc.firstName} ${slot.rc.lastName}`.trim()
+        : null
+
+      return {
+        id: slot.id,
+        title: slot.title,
+        description: slot.description || null,
+        type: slot.type,
+        startTime: new Date(slot.startTime).toISOString(),
+        endTime: new Date(slot.endTime).toISOString(),
+        location: slot.location || null,
+        roomName: slot.room?.name || slot.location || null,
+        sections: uniqueSectionNames,
+        targetGroup: slot.targetGroup || null,
+        speaker: speakerName,
+        assistant: assistantName,
+        rc: rcName,
+      }
+    })
+
+    const jsonStr = JSON.stringify(exportData, null, 2)
+    const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `planning_s4s_${new Date().toISOString().slice(0, 10)}.json`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  const handleExportCSV = () => {
+    if (!safeSlots || safeSlots.length === 0) {
+      alert('Aucun créneau à exporter.')
+      return
+    }
+
+    const headers = [
+      'Titre',
+      'Description',
+      'Type',
+      'HeureDebut',
+      'HeureFin',
+      'Lieu',
+      'Sections',
+      'Groupe',
+      'Speaker',
+      'Assistant',
+      'RC',
+    ]
+
+    const escapeCSV = (val: any) => {
+      if (val === null || val === undefined) return '""'
+      const str = String(val).replace(/"/g, '""')
+      return `"${str}"`
+    }
+
+    const rows = safeSlots.map((slot) => {
+      const sectionNames = [
+        slot.section?.name,
+        ...(slot.sections || []).map((s: any) => s.name),
+      ].filter(Boolean)
+      const uniqueSectionNames = Array.from(new Set(sectionNames)).join(', ')
+
+      const speakerName = slot.speaker
+        ? `${slot.speaker.firstName} ${slot.speaker.lastName}`.trim()
+        : ''
+      const assistantName = slot.assistant
+        ? `${slot.assistant.firstName} ${slot.assistant.lastName}`.trim()
+        : ''
+      const rcName = slot.rc
+        ? `${slot.rc.firstName} ${slot.rc.lastName}`.trim()
+        : ''
+
+      return [
+        escapeCSV(slot.title),
+        escapeCSV(slot.description || ''),
+        escapeCSV(slot.type),
+        escapeCSV(new Date(slot.startTime).toISOString()),
+        escapeCSV(new Date(slot.endTime).toISOString()),
+        escapeCSV(slot.location || ''),
+        escapeCSV(uniqueSectionNames),
+        escapeCSV(slot.targetGroup || ''),
+        escapeCSV(speakerName),
+        escapeCSV(assistantName),
+        escapeCSV(rcName),
+      ].join(';')
+    })
+
+    const csvContent = [headers.join(';'), ...rows].join('\n')
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `planning_s4s_${new Date().toISOString().slice(0, 10)}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -478,7 +611,7 @@ function Schedule() {
             </div>
           )}
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'right', flex:1  }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'flex-end', flex: 1, flexWrap: 'wrap' }}>
           {viewType === 'section' && (
             <button
               className="btn-primary"
@@ -497,6 +630,93 @@ function Schedule() {
               + Ajouter un shift
             </button>
           )}
+          <button
+            className="btn-primary"
+            onClick={() => setShowImportModal(true)}
+            style={{
+              marginTop: 0,
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              color: 'white',
+            }}
+            title="Importer des données du planning (JSON ou CSV)"
+          >
+            📥 Importer
+          </button>
+          <div style={{ position: 'relative' }}>
+            <button
+              className="btn-primary"
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              style={{
+                marginTop: 0,
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                color: 'white',
+              }}
+              title="Exporter les données du planning"
+            >
+              📤 Exporter ▾
+            </button>
+            {showExportMenu && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '0.35rem',
+                  background: '#1e293b',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '6px',
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)',
+                  zIndex: 50,
+                  minWidth: '160px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                }}
+              >
+                <button
+                  onClick={() => {
+                    handleExportJSON()
+                    setShowExportMenu(false)
+                  }}
+                  style={{
+                    padding: '0.6rem 1rem',
+                    textAlign: 'left',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  📄 Exporter en JSON
+                </button>
+                <button
+                  onClick={() => {
+                    handleExportCSV()
+                    setShowExportMenu(false)
+                  }}
+                  style={{
+                    padding: '0.6rem 1rem',
+                    textAlign: 'left',
+                    background: 'transparent',
+                    border: 'none',
+                    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  📊 Exporter en CSV
+                </button>
+              </div>
+            )}
+          </div>
           <button
             className="btn-primary"
             onClick={() => window.print()}
@@ -589,6 +809,11 @@ function Schedule() {
         <CreateShiftModal
           defaultStaffId={viewType === 'person' && activeEntityId !== 'none' ? activeEntityId : ''}
           onClose={() => setShowCreateShiftModal(false)}
+        />
+      )}
+      {showImportModal && (
+        <ImportScheduleModal
+          onClose={() => setShowImportModal(false)}
         />
       )}
       {selectedSlotForEdit && (

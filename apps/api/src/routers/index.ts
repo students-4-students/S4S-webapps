@@ -10,6 +10,7 @@ import { shiftsRouter } from './shifts'
 import { scanRouter } from './scan'
 import { driveRouter } from './drive'
 import { feedbackRouter } from './feedback'
+import { roomsRouter } from './rooms'
 
 export const appRouter = router({
   auth: authRouter,
@@ -23,6 +24,7 @@ export const appRouter = router({
   scan: scanRouter,
   drive: driveRouter,
   feedback: feedbackRouter,
+  rooms: roomsRouter,
 })
 
 export type AppRouter = typeof appRouter

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { trpc } from '../trpc'
-import { Modal, Input, Select, Button } from '@s4s/ui'
+import { Modal, Input, Select, Button, MultiSelectCombobox } from '@s4s/ui'
 import StaffCombobox from './StaffCombobox'
 
 const DAYS = [
@@ -43,6 +43,8 @@ function EditClassModal({ slot, onClose, onDuplicate }: Props) {
     return `${hours}:${minutes}`
   }
 
+  const { data: dbRooms = [] } = trpc.rooms.list.useQuery()
+
   const [title, setTitle] = useState(slot.title)
   const [type, setType] = useState<'LECTURE' | 'EXERCISE' | 'SPECIAL' | 'MEAL'>(
     slot.type === 'EXERCISE' ? 'EXERCISE' : (slot.type === 'SPECIAL' ? 'SPECIAL' : (slot.type === 'MEAL' ? 'MEAL' : 'LECTURE'))
@@ -50,8 +52,44 @@ function EditClassModal({ slot, onClose, onDuplicate }: Props) {
   const [day, setDay] = useState(formatYYYYMMDD(startObj))
   const [startTime, setStartTime] = useState(formatHHMM(startObj))
   const [endTime, setEndTime] = useState(formatHHMM(endObj))
+
   const [location, setLocation] = useState(slot.location || '')
-  const [sectionId, setSectionId] = useState(slot.section?.name || 'CMS')
+  const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([])
+  const [isRoomsInitialized, setIsRoomsInitialized] = useState(false)
+
+  React.useEffect(() => {
+    if (dbRooms.length > 0 && !isRoomsInitialized) {
+      const loc = slot.location || ''
+      const locNames = loc.split(/[,;/]+/).map((s: string) => s.trim().toUpperCase()).filter(Boolean)
+
+      let matched: string[] = []
+      if (locNames.length > 0) {
+        matched = dbRooms
+          .filter((r: any) => {
+            const rName = r.name.trim().toUpperCase()
+            return locNames.includes(rName) || locNames.some((l: string) => l === rName || l.includes(rName) || rName.includes(l))
+          })
+          .map((r: any) => r.id)
+      }
+
+      if (matched.length === 0 && slot.roomId) {
+        matched = [slot.roomId]
+      }
+
+      setSelectedRoomIds(matched)
+      setIsRoomsInitialized(true)
+    }
+  }, [dbRooms, slot.location, slot.roomId, isRoomsInitialized])
+
+  const [selectedSections, setSelectedSections] = useState<string[]>(() => {
+    if (slot.sections && slot.sections.length > 0) {
+      return slot.sections.map((s: any) => s.name.toUpperCase())
+    }
+    if (slot.section?.name) {
+      return [slot.section.name.toUpperCase()]
+    }
+    return ['CMS']
+  })
   const [targetGroup, setTargetGroup] = useState<'ALL' | 'A' | 'B'>(
     slot.targetGroup || 'ALL'
   )
@@ -65,7 +103,7 @@ function EditClassModal({ slot, onClose, onDuplicate }: Props) {
       startTime: new Date(`${day}T${startTime}:00`),
       endTime: new Date(`${day}T${endTime}:00`),
       location: location || undefined,
-      sectionId: sectionId || undefined,
+      sectionIds: selectedSections,
     },
     {
       enabled: Boolean(day && startTime && endTime),
@@ -73,7 +111,26 @@ function EditClassModal({ slot, onClose, onDuplicate }: Props) {
   )
   const conflicts = conflictQuery.data || []
 
-  const { data: staffs = [] } = trpc.staffs.list.useQuery()
+  const toggleSection = (sec: string) => {
+    if (selectedSections.includes(sec)) {
+      setSelectedSections(selectedSections.filter((s) => s !== sec))
+    } else {
+      setSelectedSections([...selectedSections, sec])
+    }
+  }
+
+  const selectAllExceptPolysi = () => {
+    setSelectedSections(SECTIONS.filter((s) => s !== 'POLYSI'))
+  }
+
+  const selectBA1 = () => {
+    const excluded = ['POLYSI', 'MA', 'PH', 'CMS', 'AR']
+    setSelectedSections(SECTIONS.filter((s) => !excluded.includes(s)))
+  }
+
+  const selectPhMa = () => {
+    setSelectedSections(['PH', 'MA'])
+  }
 
   const updateMutation = trpc.schedules.update.useMutation({
     onSuccess: () => {
@@ -91,9 +148,15 @@ function EditClassModal({ slot, onClose, onDuplicate }: Props) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (selectedSections.length === 0) {
+      alert('Veuillez sélectionner au moins une section.')
+      return
+    }
 
     const startStr = `${day}T${startTime}:00`
     const endStr = `${day}T${endTime}:00`
+    const matchedRooms = dbRooms.filter((r: any) => selectedRoomIds.includes(r.id))
+    const locationStr = matchedRooms.length > 0 ? matchedRooms.map((r: any) => r.name).join(', ') : (location || null)
 
     updateMutation.mutate({
       id: slot.id,
@@ -101,8 +164,10 @@ function EditClassModal({ slot, onClose, onDuplicate }: Props) {
       type,
       startTime: new Date(startStr),
       endTime: new Date(endStr),
-      location: location || null,
-      sectionId,
+      location: locationStr,
+      roomId: selectedRoomIds[0] || null,
+      sectionId: selectedSections[0] || null,
+      sectionIds: selectedSections,
       targetGroup: targetGroup === 'ALL' ? null : targetGroup,
       speakerId: speakerId || null,
       assistantId: assistantId || null,
@@ -187,24 +252,73 @@ function EditClassModal({ slot, onClose, onDuplicate }: Props) {
           />
         </div>
 
-        <Input
-          label="Salle / Lieu"
-          placeholder="Ex: CO2, INM202"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-        />
+        <div style={{ marginBottom: '1rem' }}>
+          <MultiSelectCombobox
+            label="Locaux / Salles"
+            placeholder="Rechercher des locaux (ex: BC 410, CO 1)..."
+            options={dbRooms.map((r: any) => ({
+              id: r.id,
+              label: r.name,
+              sublabel: r.building ? `Bâtiment ${r.building}` : undefined,
+              category: r.building ? r.building.toUpperCase() : undefined,
+            }))}
+            selectedIds={selectedRoomIds}
+            onChange={(nextIds) => {
+              const matchedNames = dbRooms
+                .filter((r: any) => nextIds.includes(r.id))
+                .map((r: any) => r.name)
+              setSelectedRoomIds(nextIds)
+              setLocation(matchedNames.join(', '))
+            }}
+            categories={Array.from(
+              new Set(dbRooms.map((r: any) => r.building?.toUpperCase()).filter(Boolean) as string[])
+            )}
+          />
+        </div>
 
-        <Select
-          label="Section"
-          value={sectionId}
-          onChange={(e) => setSectionId(e.target.value)}
-        >
-          {SECTIONS.map((sec) => (
-            <option key={sec} value={sec}>
-              {sec}
-            </option>
-          ))}
-        </Select>
+        <div style={{ marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <label className="s4s-label">Sections * (Sélectionnez au moins une)</label>
+            <div style={{ display: 'flex', gap: '0.35rem' }}>
+              <Button type="button" variant="outline" size="sm" onClick={selectAllExceptPolysi} style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}>
+                Toutes (sans POLYSI)
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={selectBA1} style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}>
+                BA1
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={selectPhMa} style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}>
+                PH-MA
+              </Button>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem', marginTop: '0.375rem' }}>
+            {SECTIONS.map((sec) => {
+              const isSelected = selectedSections.includes(sec)
+              return (
+                <button
+                  key={sec}
+                  type="button"
+                  onClick={() => toggleSection(sec)}
+                  style={{
+                    padding: '0.4rem',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    borderRadius: 'var(--s4s-radius-sm)',
+                    border: '1px solid',
+                    borderColor: isSelected ? 'var(--s4s-primary)' : 'rgba(255, 255, 255, 0.2)',
+                    background: isSelected ? 'var(--s4s-primary)' : 'rgba(255, 255, 255, 0.08)',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    transition: 'all var(--s4s-transition-fast)',
+                    textAlign: 'center'
+                  }}
+                >
+                  {sec}
+                </button>
+              )
+            })}
+          </div>
+        </div>
 
         <div style={{ marginBottom: '1rem' }}>
           <label className="s4s-label">Groupe concerné (Optionnel)</label>
@@ -283,10 +397,12 @@ function EditClassModal({ slot, onClose, onDuplicate }: Props) {
                   onDuplicate({
                     title,
                     type,
-                    section: { name: sectionId },
+                    section: { name: selectedSections[0] },
+                    sections: selectedSections.map((name) => ({ name })),
                     startTime: `${day}T${startTime}:00`,
                     endTime: `${day}T${endTime}:00`,
                     location,
+                    roomId: selectedRoomIds[0] || null,
                     speakerId,
                     assistantId,
                     rcId,

@@ -40,7 +40,14 @@ export default function Home() {
         if (slotDateStr !== todayStr) return false
 
         if (userSectionId) {
-          return !slot.sectionId || slot.sectionId === userSectionId
+          const slotSectionIds = [
+            slot.sectionId,
+            ...((slot as any).sections || []).map((s: any) => s.id),
+          ].filter(Boolean)
+
+          if (slotSectionIds.length > 0 && !slotSectionIds.includes(userSectionId)) {
+            return false
+          }
         }
         return true
       })
@@ -185,7 +192,17 @@ export default function Home() {
                         {slot.title}
                         {isLive && <span className="live-tag">En cours</span>}
                       </div>
-                      {slot.location && <div className="flat-item-meta">📍 {slot.location}</div>}
+                      {slot.location && (
+                        <Link
+                          to="/map"
+                          search={{ places: slot.location } as any}
+                          className="flat-item-meta location-link"
+                          style={{ textDecoration: 'none', color: 'inherit', cursor: 'pointer' }}
+                          title="Voir sur le plan"
+                        >
+                          📍 {slot.location}
+                        </Link>
+                      )}
                     </div>
                   </div>
                 )
@@ -214,7 +231,21 @@ export default function Home() {
                   <div className="flat-item-content">
                     <div className="flat-item-title">{reg.workshopTitle}</div>
                     <div className="flat-item-meta">
-                      📅 {new Date(reg.startTime).toLocaleDateString('fr-CH', { day: 'numeric', month: 'short' })} • 📍 {reg.location}
+                      <span>📅 {new Date(reg.startTime).toLocaleDateString('fr-CH', { day: 'numeric', month: 'short' })}</span>
+                      {reg.location && (
+                        <>
+                          <span> • </span>
+                          <Link
+                            to="/map"
+                            search={{ places: reg.location } as any}
+                            className="location-link"
+                            style={{ textDecoration: 'none', color: 'inherit', cursor: 'pointer' }}
+                            title="Voir sur le plan"
+                          >
+                            📍 {reg.location}
+                          </Link>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

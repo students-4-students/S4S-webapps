@@ -41,7 +41,6 @@ export default function CreateShiftModal({ defaultStaffId = '', onClose }: Props
   const [location, setLocation] = useState('')
   const [notes, setNotes] = useState('')
 
-  const { data: staffs = [] } = trpc.staffs.list.useQuery()
   const createMutation = trpc.shifts.create.useMutation({
     onSuccess: () => {
       utils.shifts.list.invalidate()

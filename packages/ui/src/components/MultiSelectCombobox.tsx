@@ -31,6 +31,7 @@ export const MultiSelectCombobox: React.FC<MultiSelectComboboxProps> = ({
 
   // Close dropdown on click outside
   useEffect(() => {
+    if (!isOpen) return
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false)
@@ -38,7 +39,7 @@ export const MultiSelectCombobox: React.FC<MultiSelectComboboxProps> = ({
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [isOpen])
 
   const selectedOptions = useMemo(() => {
     return options.filter((o) => selectedIds.includes(o.id))
@@ -84,12 +85,17 @@ export const MultiSelectCombobox: React.FC<MultiSelectComboboxProps> = ({
   }
 
   return (
-    <div className="s4s-form-field" ref={containerRef} style={{ position: 'relative' }}>
+    <div
+      className="s4s-form-field"
+      ref={containerRef}
+      onMouseDown={(e) => e.stopPropagation()}
+      style={{ position: 'relative' }}
+    >
       {label && <label className="s4s-label">{label}</label>}
 
       {/* Selected Chips Container */}
       <div
-        onClick={() => setIsOpen(true)}
+        onClick={() => setIsOpen((prev) => !prev)}
         style={{
           minHeight: '2.5rem',
           padding: '0.375rem 0.5rem',
@@ -168,7 +174,7 @@ export const MultiSelectCombobox: React.FC<MultiSelectComboboxProps> = ({
             border: '1px solid var(--s4s-border)',
             borderRadius: 'var(--s4s-radius-md)',
             boxShadow: 'var(--s4s-shadow-lg)',
-            zIndex: 1100,
+            zIndex: 9999,
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
@@ -234,7 +240,7 @@ export const MultiSelectCombobox: React.FC<MultiSelectComboboxProps> = ({
           <div style={{ overflowY: 'auto', flex: 1, padding: '0.25rem 0' }}>
             {filteredOptions.length === 0 ? (
               <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.8rem', color: 'var(--s4s-text-muted)' }}>
-                Aucun membre ne correspond à la recherche.
+                Aucun résultat ne correspond à la recherche.
               </div>
             ) : (
               filteredOptions.map((opt) => {
@@ -273,7 +279,10 @@ export const MultiSelectCombobox: React.FC<MultiSelectComboboxProps> = ({
                     <input
                       type="checkbox"
                       checked={isChecked}
-                      onChange={() => {}} // Handled by parent div
+                      onChange={(e) => {
+                        e.stopPropagation()
+                        toggleOption(opt.id)
+                      }}
                       style={{ cursor: 'pointer' }}
                     />
                   </div>

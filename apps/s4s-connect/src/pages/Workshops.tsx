@@ -17,6 +17,13 @@ interface WorkshopSession {
   id: string
   startTime: Date | string
   endTime: Date | string
+  roomId?: string | null
+  location?: string | null
+  room?: {
+    id: string
+    name: string
+    building?: string | null
+  } | null
   registrations?: WorkshopRegistration[]
 }
 
@@ -24,9 +31,16 @@ interface Workshop {
   id: string
   title: string
   location: string
+  roomId?: string | null
+  room?: {
+    id: string
+    name: string
+    building?: string | null
+  } | null
   description: string
   image: string | null
   requiresRegistration: boolean
+  externalRegistrationUrl?: string | null
   maxParticipants: number | null
   dates: WorkshopSession[]
 }
@@ -448,7 +462,11 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
         )}
         <div className="workshop-badge-container">
           {w.requiresRegistration ? (
-            <span className="badge-reg required">Inscription requise{w.maxParticipants ? ` · ${w.maxParticipants} max` : ''}</span>
+            w.externalRegistrationUrl ? (
+              <span className="badge-reg external">🔗 Formulaire externe</span>
+            ) : (
+              <span className="badge-reg required">Inscription requise{w.maxParticipants ? ` · ${w.maxParticipants} max` : ''}</span>
+            )
           ) : (
             <span className="badge-reg open">Entrée libre</span>
           )}
@@ -461,10 +479,17 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
 
       <div className="workshop-card-body">
         <h3 className="workshop-card-title">{w.title}</h3>
-        <div className="workshop-card-location">
+        <Link
+          to="/map"
+          search={{ places: w.location } as any}
+          className="workshop-card-location location-link"
+          style={{ textDecoration: 'none', color: 'inherit', cursor: 'pointer' }}
+          title="Voir sur le plan"
+          onClick={(e) => e.stopPropagation()}
+        >
           <span>📍</span>
           <span>{w.location}</span>
-        </div>
+        </Link>
         <p className="workshop-card-desc">{w.description}</p>
 
         <div className="workshop-card-slots-section">
@@ -488,6 +513,8 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
                       <div className="slot-spots-badge">
                         {isPast ? (
                           <span className="spots-tag past">Terminé</span>
+                        ) : w.externalRegistrationUrl ? (
+                          <span className="spots-tag open" style={{ background: 'rgba(37, 99, 235, 0.15)', color: '#60a5fa' }}>Lien externe</span>
                         ) : spots === null ? (
                           <span className="spots-tag open">Entrée libre</span>
                         ) : spots.available === 0 && !isReg ? (
@@ -499,21 +526,33 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
                         )}
                       </div>
                     </div>
-                    <button
-                      className={`btn-slot-register ${isReg ? 'registered' : ''}`}
-                      disabled={isPast || (spots !== null && spots.available === 0 && !isReg)}
-                      onClick={(e) => { e.stopPropagation(); onRegisterToggle(w, d) }}
-                    >
-                      {isPast ? (
-                        <span>Terminé</span>
-                      ) : isReg ? (
-                        <><span className="reg-icon">✓</span><span className="reg-status-label">Inscrit(e)</span><span className="reg-hover-label">Désinscrire</span></>
-                      ) : spots !== null && spots.available === 0 ? (
-                        <span>Complet</span>
-                      ) : (
-                        <><span className="reg-icon">+</span><span>S'inscrire</span></>
-                      )}
-                    </button>
+                    {w.externalRegistrationUrl ? (
+                      <a
+                        href={w.externalRegistrationUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-slot-register external-link-btn"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <span>Formulaire ↗</span>
+                      </a>
+                    ) : (
+                      <button
+                        className={`btn-slot-register ${isReg ? 'registered' : ''}`}
+                        disabled={isPast || (spots !== null && spots.available === 0 && !isReg)}
+                        onClick={(e) => { e.stopPropagation(); onRegisterToggle(w, d) }}
+                      >
+                        {isPast ? (
+                          <span>Terminé</span>
+                        ) : isReg ? (
+                          <><span className="reg-icon">✓</span><span className="reg-status-label">Inscrit(e)</span><span className="reg-hover-label">Désinscrire</span></>
+                        ) : spots !== null && spots.available === 0 ? (
+                          <span>Complet</span>
+                        ) : (
+                          <><span className="reg-icon">+</span><span>S'inscrire</span></>
+                        )}
+                      </button>
+                    )}
                   </div>
                 )
                 })}
@@ -578,7 +617,11 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
 
           <div className="detail-header-content">
             {w.requiresRegistration ? (
-              <span className="badge-reg required">Inscription requise{w.maxParticipants ? ` · ${w.maxParticipants} max` : ''}</span>
+              w.externalRegistrationUrl ? (
+                <span className="badge-reg external">🔗 Formulaire externe</span>
+              ) : (
+                <span className="badge-reg required">Inscription requise{w.maxParticipants ? ` · ${w.maxParticipants} max` : ''}</span>
+              )
             ) : (
               <span className="badge-reg open">Entrée libre</span>
             )}
@@ -594,7 +637,7 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
             <span className="detail-location-text">{w.location}</span>
             <Link
               to="/map"
-              search={{ places: w.location.split(' ')[0] } as any}
+              search={{ places: w.location } as any}
               className="detail-map-link"
               onClick={onClose}
             >
@@ -603,6 +646,24 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
           </div>
 
           <p className="detail-description">{w.description}</p>
+
+          {/* External registration banner */}
+          {w.externalRegistrationUrl && (
+            <div style={{ margin: '1rem 0', padding: '0.9rem 1.1rem', background: 'rgba(37, 99, 235, 0.15)', border: '1px solid rgba(37, 99, 235, 0.35)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '0.86rem', color: '#ffffff' }}>
+                <strong>📝 Formulaire externe d'inscription :</strong> Les inscriptions pour cet atelier sont gérées via un formulaire en ligne.
+              </div>
+              <a
+                href={w.externalRegistrationUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-slot-register external-link-btn"
+                style={{ padding: '0.5rem 1rem', fontSize: '0.82rem' }}
+              >
+                <span>Remplir le formulaire ↗</span>
+              </a>
+            </div>
+          )}
 
           <div className="detail-slots-section">
             <h3 className="detail-slots-title">
@@ -622,6 +683,8 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
                         <span className="detail-slot-num">Créneau {idx + 1}</span>
                         {isPast ? (
                           <span className="spots-tag past">Terminé</span>
+                        ) : w.externalRegistrationUrl ? (
+                          <span className="spots-tag open" style={{ background: 'rgba(37, 99, 235, 0.15)', color: '#60a5fa' }}>Lien externe</span>
                         ) : spots === null ? (
                           <span className="spots-tag open">Entrée libre</span>
                         ) : spots.available === 0 && !isReg ? (
@@ -632,23 +695,42 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
                           <span className="spots-tag available">{spots.available}/{spots.max} places</span>
                         )}
                       </div>
-                      <div className="detail-slot-time">{formatDateTimeRange(d.startTime, d.endTime)}</div>
+                      <div className="detail-slot-time">
+                        {formatDateTimeRange(d.startTime, d.endTime)}
+                        {(d.room?.name || d.location) && (d.room?.name || d.location) !== (w.room?.name || w.location) && (
+                          <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', opacity: 0.85 }}>
+                            📍 {d.room?.name || d.location}
+                          </span>
+                        )}
+                      </div>
                       {w.requiresRegistration && (
-                        <button
-                          className={`detail-slot-btn ${isReg ? 'registered' : ''}`}
-                          disabled={spots !== null && spots.available === 0 && !isReg}
-                          onClick={() => onRegisterToggle(w, d)}
-                        >
-                          {isPast ? (
-                            <span>Créneau terminé</span>
-                          ) : isReg ? (
-                            <><span>✓ Inscrit(e)</span><span className="detail-slot-btn-hover">Annuler l'inscription</span></>
-                          ) : spots !== null && spots.available === 0 ? (
-                            <span>Complet</span>
-                          ) : (
-                            <span>+ S'inscrire à ce créneau</span>
-                          )}
-                        </button>
+                        w.externalRegistrationUrl ? (
+                          <a
+                            href={w.externalRegistrationUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="detail-slot-btn external-link-btn"
+                            style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                          >
+                            <span>S'inscrire (Formulaire externe) ↗</span>
+                          </a>
+                        ) : (
+                          <button
+                            className={`detail-slot-btn ${isReg ? 'registered' : ''}`}
+                            disabled={spots !== null && spots.available === 0 && !isReg}
+                            onClick={() => onRegisterToggle(w, d)}
+                          >
+                            {isPast ? (
+                              <span>Créneau terminé</span>
+                            ) : isReg ? (
+                              <><span>✓ Inscrit(e)</span><span className="detail-slot-btn-hover">Annuler l'inscription</span></>
+                            ) : spots !== null && spots.available === 0 ? (
+                              <span>Complet</span>
+                            ) : (
+                              <span>+ S'inscrire à ce créneau</span>
+                            )}
+                          </button>
+                        )
                       )}
                     </div>
                   )

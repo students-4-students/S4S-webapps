@@ -641,7 +641,7 @@ export default function Gest4SFeedback() {
           isOpen={showBuilderModal}
           onClose={closeBuilderModal}
           title={editingSurveyId ? 'Éditer le sondage étudiant' : 'Créer un sondage étudiant'}
-          size="xl"
+          size="lg"
         >
           <form onSubmit={handleSaveSurvey} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxHeight: '80vh', overflowY: 'auto', paddingRight: '4px' }}>
             <div>
