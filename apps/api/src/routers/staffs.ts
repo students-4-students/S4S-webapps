@@ -1,6 +1,11 @@
 import { z } from 'zod'
 import { router, protectedProcedure, publicProcedure } from '../trpc/trpc'
 import { EventEmitter, on } from 'events'
+import bcrypt from 'bcrypt'
+import jwt from 'jsonwebtoken'
+import crypto from 'crypto'
+import { TRPCError } from '@trpc/server'
+import { sendPasswordReset } from '../lib/mailer'
 
 export const staffsEmitter = new EventEmitter()
 staffsEmitter.setMaxListeners(100)
@@ -222,6 +227,135 @@ export const staffsRouter = router({
       });
       staffsEmitter.emit('updated')
       return { success: true };
+    }),
+
+  resetPassword: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const staff = await ctx.db.staffMember.findUniqueOrThrow({
+        where: { id: input.id },
+        include: { user: true },
+      })
+
+      let user = staff.user
+
+      if (!user) {
+        if (staff.email) {
+          const existingUser = await ctx.db.user.findUnique({
+            where: { email: staff.email },
+          })
+          if (existingUser) {
+            user = existingUser
+            await ctx.db.staffMember.update({
+              where: { id: staff.id },
+              data: { userId: user.id },
+            })
+          }
+        }
+
+        if (!user) {
+          if (!staff.email) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Veuillez d\'abord renseigner une adresse email pour ce membre du staff.',
+            })
+          }
+
+          const tempPassword = crypto.randomUUID()
+          const hashedPassword = await bcrypt.hash(tempPassword, 10)
+
+          user = await ctx.db.user.create({
+            data: {
+              firstName: staff.firstName,
+              lastName: staff.lastName,
+              email: staff.email,
+              password: hashedPassword,
+              role: staff.role.toLowerCase().includes('comité') || staff.role.toLowerCase().includes('admin') ? 'ADMIN' : 'STAFF',
+              passwordConfigured: false,
+            },
+          })
+
+          await ctx.db.staffMember.update({
+            where: { id: staff.id },
+            data: { userId: user.id },
+          })
+        }
+      }
+
+      // Reset password on User record
+      const tempPassword = crypto.randomUUID()
+      const hashedPassword = await bcrypt.hash(tempPassword, 10)
+
+      await ctx.db.user.update({
+        where: { id: user.id },
+        data: {
+          password: hashedPassword,
+          passwordConfigured: false,
+        },
+      })
+
+      // Generate a setup token (no time expiration)
+      const token = jwt.sign(
+        { userId: user.id, email: user.email, action: 'setup-password' },
+        process.env.JWT_SECRET!
+      )
+
+      console.log(`\n========================================================================\n[STAFF PASSWORD RESET] Setup password link for ${staff.firstName} ${staff.lastName} (${user.email}):\nhttps://s4s-connect.students4students.ch/setup-password?token=${token}\n========================================================================\n`)
+
+      staffsEmitter.emit('updated')
+      return {
+        staffId: staff.id,
+        userId: user.id,
+        name: `${staff.firstName} ${staff.lastName}`,
+        email: user.email,
+        setupUrl: `https://s4s-connect.students4students.ch/setup-password?token=${token}`,
+      }
+    }),
+
+  sendPasswordResetEmail: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const staff = await ctx.db.staffMember.findUniqueOrThrow({
+        where: { id: input.id },
+        include: { user: true },
+      })
+
+      let user = staff.user
+      if (!user && staff.email) {
+        user = await ctx.db.user.findUnique({ where: { email: staff.email } })
+      }
+
+      if (!user || !user.email) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Aucun compte utilisateur ou adresse email valide associé à ce membre du staff.',
+        })
+      }
+
+      const tempPassword = crypto.randomUUID()
+      const hashedPassword = await bcrypt.hash(tempPassword, 10)
+
+      await ctx.db.user.update({
+        where: { id: user.id },
+        data: { password: hashedPassword, passwordConfigured: false },
+      })
+
+      const token = jwt.sign(
+        { userId: user.id, email: user.email, action: 'setup-password' },
+        process.env.JWT_SECRET!
+      )
+
+      const setupUrl = `https://s4s-connect.students4students.ch/setup-password?token=${token}`
+
+      await sendPasswordReset({
+        email: user.email,
+        firstName: staff.firstName,
+        lastName: staff.lastName,
+        setupUrl,
+      })
+
+      staffsEmitter.emit('updated')
+      return { success: true }
     }),
 
   trigger: publicProcedure.mutation(async () => {

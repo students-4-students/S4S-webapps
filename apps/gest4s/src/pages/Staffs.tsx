@@ -55,6 +55,7 @@ function Staffs() {
   const [editSpeakerClassNames, setEditSpeakerClassNames] = useState<string[]>([])
   const [editAssistantClassNames, setEditAssistantClassNames] = useState<string[]>([])
   const [editRcClassNames, setEditRcClassNames] = useState<string[]>([])
+  const [resetLinkInfo, setResetLinkInfo] = useState<{ id?: string; name: string; email?: string; setupUrl: string } | null>(null)
 
   const utils = trpc.useUtils()
 
@@ -68,7 +69,6 @@ function Staffs() {
       label: name,
     }))
   }, [classNames])
-
 
   trpc.staffs.onUpdated.useSubscription(undefined, {
     onData: () => {
@@ -84,6 +84,7 @@ function Staffs() {
   const updateMutation = trpc.staffs.update.useMutation()
   const deleteMutation = trpc.staffs.delete.useMutation()
   const assignToCoursesMutation = trpc.staffs.assignToCourses.useMutation()
+  const resetPasswordMutation = trpc.staffs.resetPassword.useMutation()
 
   const filteredStaffs = staffs.filter((staff) => {
     const searchString = `${staff.firstName} ${staff.lastName} ${staff.role}`.toLowerCase()
@@ -128,6 +129,9 @@ function Staffs() {
         speakerClassNames: selectedSpeakerClassNames,
         assistantClassNames: selectedAssistantClassNames,
         rcClassNames: selectedRcClassNames,
+        speakerSlotIds: [],
+        assistantSlotIds: [],
+        rcSlotIds: [],
       })
 
       alert('Membre du staff créé avec succès !')
@@ -217,6 +221,9 @@ function Staffs() {
         speakerClassNames: editSpeakerClassNames,
         assistantClassNames: editAssistantClassNames,
         rcClassNames: editRcClassNames,
+        speakerSlotIds: [],
+        assistantSlotIds: [],
+        rcSlotIds: [],
       })
 
       alert('Membre du staff modifié avec succès !')
@@ -251,6 +258,39 @@ function Staffs() {
     } catch (err: any) {
       console.error(err)
       alert('Erreur lors de la suppression: ' + (err.message || err))
+    }
+  }
+
+  const handleResetPassword = async () => {
+    if (!editingStaff) return
+    const targetEmail = editEmail.trim() || editingStaff.email?.trim()
+    if (!targetEmail) {
+      alert("Veuillez d'abord renseigner une adresse email pour ce membre du staff.")
+      return
+    }
+
+    const msg = `Voulez-vous générer un lien de réinitialisation / configuration du mot de passe pour ${editFirstName} ${editLastName} ?`
+    if (!window.confirm(msg)) return
+
+    try {
+      if (editEmail.trim() !== (editingStaff.email || '')) {
+        await updateMutation.mutateAsync({
+          id: editingStaff.id,
+          email: editEmail.trim(),
+        })
+      }
+
+      const result = await resetPasswordMutation.mutateAsync({ id: editingStaff.id })
+      setShowEditModal(false)
+      setResetLinkInfo({
+        id: editingStaff.id,
+        name: result.name,
+        email: result.email || targetEmail,
+        setupUrl: result.setupUrl,
+      })
+    } catch (err: any) {
+      console.error(err)
+      alert('Erreur lors de la réinitialisation: ' + (err.message || err))
     }
   }
 
@@ -659,6 +699,35 @@ function Staffs() {
             onChange={(e) => setEditTelegramUsername(e.target.value)}
           />
 
+          <div
+            style={{
+              marginTop: '1rem',
+              padding: '0.75rem 1rem',
+              border: '1px dashed var(--s4s-border)',
+              borderRadius: '0.6rem',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'rgba(255, 255, 255, 0.02)',
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Accès & Mot de passe</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--s4s-text-muted)' }}>
+                Générer un lien de configuration / réinitialisation du mot de passe
+              </span>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleResetPassword}
+              isLoading={resetPasswordMutation.isPending}
+            >
+              🔄 Créer le lien
+            </Button>
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
             <Button type="button" variant="secondary" onClick={() => setShowEditModal(false)}>
               Annuler
@@ -669,6 +738,78 @@ function Staffs() {
           </div>
         </form>
       </Modal>
+
+      {/* QR Code / Reset password link modal */}
+      {resetLinkInfo && (
+        <Modal
+          isOpen={true}
+          onClose={() => setResetLinkInfo(null)}
+          title="🔑 Lien de réinitialisation du mot de passe"
+          size="sm"
+        >
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ fontSize: '0.875rem', color: 'var(--s4s-text-secondary)', marginTop: 0, lineHeight: '1.4' }}>
+              Scannez le QR Code ci-dessous pour configurer ou réinitialiser le mot de passe de{' '}
+              <strong>{resetLinkInfo.name}</strong>, ou copiez le lien direct :
+            </p>
+
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+                resetLinkInfo.setupUrl
+              )}`}
+              alt="QR Code réinitialisation mot de passe"
+              style={{
+                display: 'block',
+                margin: '1.25rem auto',
+                border: '1px solid var(--s4s-border)',
+                padding: '0.5rem',
+                borderRadius: '0.5rem',
+                background: 'white',
+              }}
+            />
+
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
+              <input
+                type="text"
+                readOnly
+                value={resetLinkInfo.setupUrl}
+                style={{
+                  flex: 1,
+                  padding: '0.5rem',
+                  border: '1px solid var(--s4s-border)',
+                  borderRadius: '0.4rem',
+                  fontSize: '0.8rem',
+                  background: '#f8fafc',
+                  color: '#0f172a',
+                }}
+                onClick={(e) => (e.target as HTMLInputElement).select()}
+              />
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(resetLinkInfo.setupUrl)
+                  alert('Lien copié dans le presse-papier !')
+                }}
+              >
+                Copier
+              </Button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <Button
+                variant="primary"
+                size="sm"
+                style={{ width: '100%' }}
+                onClick={() => setResetLinkInfo(null)}
+              >
+                Fermer
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

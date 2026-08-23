@@ -57,6 +57,7 @@ export default function Students() {
   const sendWelcomeMutation = trpc.students.sendWelcome.useMutation()
   const sendPasswordResetEmailMutation = trpc.students.sendPasswordResetEmail.useMutation()
   const sendWelcomeToAllMutation = trpc.students.sendWelcomeToAll.useMutation()
+  const exportCsvMutation = trpc.students.exportCsv.useMutation()
 
   const filteredStudents = students.filter((student) => {
     const sectionNameStr = student.section?.name || ''
@@ -321,6 +322,48 @@ export default function Students() {
     }
   }
 
+  const handleExportCSV = async () => {
+    try {
+      const data = await exportCsvMutation.mutateAsync()
+      if (data.length === 0) {
+        alert('Aucun participant à exporter.')
+        return
+      }
+
+      const escapeCell = (val: string | null | undefined) => {
+        if (val == null) return ''
+        const str = String(val)
+        if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+          return `"${str.replace(/"/g, '""')}"`
+        }
+        return str
+      }
+
+      const headers = ['e-mail', 'nom', 's4s-link', 'groupe', 'qr-code-url']
+      const rows = data.map((item) => [
+        escapeCell(item.email),
+        escapeCell(item.nom),
+        escapeCell(item.s4sLink),
+        escapeCell(item.groupe),
+        escapeCell(item.qrCodeUrl),
+      ])
+
+      const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `participants_${new Date().toISOString().slice(0, 10)}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (err: any) {
+      console.error(err)
+      alert("Erreur lors de l'exportation CSV: " + (err.message || err))
+    }
+  }
+
   return (
     <div className="students-page">
       <PageHeader
@@ -340,6 +383,13 @@ export default function Students() {
                 onChange={handleCsvImport}
               />
             </label>
+            <Button
+              variant="secondary"
+              onClick={handleExportCSV}
+              isLoading={exportCsvMutation.isPending}
+            >
+              📤 Exporter CSV
+            </Button>
             <Button variant="secondary" onClick={() => setGroupForAllStudents()}>
               Définir les groupes du 1er jour
             </Button>

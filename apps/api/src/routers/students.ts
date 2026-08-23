@@ -46,6 +46,35 @@ export const studentsRouter = router({
     })
   }),
 
+  exportCsv: staffProcedure.mutation(async ({ ctx }) => {
+    const students = await ctx.db.user.findMany({
+      where: { role: 'PARTICIPANT' },
+      orderBy: { lastName: 'asc' },
+      include: {
+        section: true,
+      },
+    })
+
+    return students.map((student) => {
+      const token = jwt.sign(
+        { userId: student.id, email: student.email, action: 'setup-password' },
+        process.env.JWT_SECRET!
+      )
+      const s4sLink = `https://s4s-connect.students4students.ch/setup-password?token=${token}`
+      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+        student.id
+      )}`
+
+      return {
+        email: student.email,
+        nom: student.lastName,
+        s4sLink,
+        groupe: student.firstDayGroup || '',
+        qrCodeUrl,
+      }
+    })
+  }),
+
   create: staffProcedure
     .input(
       z.object({
@@ -89,7 +118,7 @@ export const studentsRouter = router({
       return {
         student,
         token,
-        setupUrl: `http://localhost:5173/setup-password?token=${token}`,
+        setupUrl: `https://s4s-connect.students4students.ch/setup-password?token=${token}`,
       }
     }),
 
@@ -240,7 +269,7 @@ export const studentsRouter = router({
       studentsEmitter.emit('updated')
       return {
         studentId: student.id,
-        setupUrl: `http://localhost:5173/setup-password?token=${token}`
+        setupUrl: `https://s4s-connect.students4students.ch/setup-password?token=${token}`
       }
     }),
 
@@ -255,7 +284,7 @@ export const studentsRouter = router({
         { userId: student.id, email: student.email, action: 'setup-password' },
         process.env.JWT_SECRET!
       )
-      const setupUrl = `http://localhost:5173/setup-password?token=${token}`
+      const setupUrl = `https://s4s-connect.students4students.ch/setup-password?token=${token}`
 
       await sendPasswordReset({
         email: student.email,
@@ -280,7 +309,7 @@ export const studentsRouter = router({
         { userId: student.id, email: student.email, action: 'setup-password' },
         process.env.JWT_SECRET!
       )
-      const setupUrl = `http://localhost:5173/setup-password?token=${token}`
+      const setupUrl = `https://s4s-connect.students4students.ch/setup-password?token=${token}`
 
       await sendWelcomeEmail({
         studentId: student.id,
@@ -316,7 +345,7 @@ export const studentsRouter = router({
           { userId: student.id, email: student.email, action: 'setup-password' },
           process.env.JWT_SECRET!
         )
-        const setupUrl = `http://localhost:5173/setup-password?token=${token}`
+        const setupUrl = `https://s4s-connect.students4students.ch/setup-password?token=${token}`
 
         await sendWelcomeEmail({
           studentId: student.id,
