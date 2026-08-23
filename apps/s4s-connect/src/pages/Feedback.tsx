@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { trpc } from '../trpc'
-import { LIKERT_5_OPTIONS } from '../../../gest4s/src/pages/Feedback'
+import { LIKERT_5_OPTIONS } from '@s4s/types'
 
 export default function S4SConnectFeedback() {
   const [selectedSurveyId, setSelectedSurveyId] = useState<string | null>(null)

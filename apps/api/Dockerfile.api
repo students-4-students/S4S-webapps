@@ -3,9 +3,12 @@ FROM oven/bun:1 AS builder
 
 WORKDIR /app
 
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 COPY apps/api/package.json ./apps/api/
+COPY apps/gest4s/package.json ./apps/gest4s/
+COPY apps/s4s-connect/package.json ./apps/s4s-connect/
 COPY packages/types/package.json ./packages/types/
+COPY packages/ui/package.json ./packages/ui/
 
 RUN bun install --frozen-lockfile
 
@@ -24,10 +27,12 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=builder /app/apps/api/package.json ./
-COPY --from=builder /app/apps/api/prisma ./prisma
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/apps/api ./apps/api
+COPY --from=builder /app/packages ./packages
+
+WORKDIR /app/apps/api
 
 EXPOSE 3001
 
