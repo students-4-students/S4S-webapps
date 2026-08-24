@@ -29,6 +29,7 @@ model User {
   welcomeEmailSentAt    DateTime?
   passwordConfigured    Boolean                @default(false)
   surveyResponses       SurveyResponse[]
+  workshopFavorites     WorkshopFavorite[]
 }
 
 model Section {
@@ -360,6 +361,7 @@ model Workshop {
   externalRegistrationUrl String?           // URL to external registration form (Google Form, etc.)
   maxParticipants         Int?              // Null means unlimited or not applicable
   dates                   WorkshopSession[]
+  favorites               WorkshopFavorite[]
   createdAt               DateTime          @default(now())
 }
 
@@ -423,5 +425,17 @@ model WorkshopRegistration {
 
   @@unique([sessionId, userId, email])
 }
+
+model WorkshopFavorite {
+  id         String   @id @default(uuid())
+  userId     String
+  workshopId String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workshop   Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, workshopId])
+}
+
 
 

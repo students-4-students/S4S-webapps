@@ -56,13 +56,17 @@ export default function Home() {
 
   // 4. Find registered workshops
   const registeredSlots = useMemo(() => {
-    if (!workshops) return []
-    const userEmail = me?.email || ''
+    if (!workshops || !me) return []
+    const userEmail = me.email?.trim().toLowerCase() || ''
+    const userId = me.id || ''
     const list: { workshopTitle: string; startTime: string; endTime: string; location: string }[] = []
 
     workshops.forEach((w) => {
       (w.dates || []).forEach((d) => {
-        const isReg = d.registrations?.some((r) => r.email === userEmail)
+        const isReg = d.registrations?.some((r) => 
+          (userId && r.userId && r.userId === userId) ||
+          (userEmail && r.email && r.email.trim().toLowerCase() === userEmail)
+        )
         if (isReg) {
           list.push({
             workshopTitle: w.title,

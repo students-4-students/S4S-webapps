@@ -92,22 +92,12 @@ export default function Workshops() {
   const [selectedSlotId, setSelectedSlotId] = useState('')
   const [studentSearchQuery, setStudentSearchQuery] = useState('')
 
-  const [participantsMap, setParticipantsMap] = useState<Record<string, Participant[]>>(() => {
-    try {
-      const saved = localStorage.getItem('gest4s_workshop_participants')
-      return saved ? JSON.parse(saved) : {}
-    } catch {
-      return {}
-    }
-  })
-
+  // Clean up legacy localStorage cache on mount
   useEffect(() => {
     try {
-      localStorage.setItem('gest4s_workshop_participants', JSON.stringify(participantsMap))
-    } catch (err) {
-      console.error('Failed to save participants map:', err)
-    }
-  }, [participantsMap])
+      localStorage.removeItem('gest4s_workshop_participants')
+    } catch {}
+  }, [])
 
   const utils = trpc.useUtils()
 
@@ -130,7 +120,7 @@ export default function Workshops() {
   }, [dbStudents, studentSearchQuery])
 
   const getWorkshopParticipants = (workshop: Workshop): Participant[] => {
-    const dbRegistrations: Participant[] = (workshop.dates || []).flatMap((d: any) =>
+    return (workshop.dates || []).flatMap((d: any) =>
       (d.registrations || []).map((r: any) => ({
         id: r.id,
         firstName: r.firstName || r.user?.firstName || 'Étudiant',
@@ -142,14 +132,6 @@ export default function Workshops() {
         isPresent: Boolean(r.isPresent),
       }))
     )
-
-    const localList = participantsMap[workshop.id] || []
-    const combinedMap = new Map<string, Participant>()
-
-    dbRegistrations.forEach(p => combinedMap.set(p.id, p))
-    localList.forEach(p => combinedMap.set(p.id, p))
-
-    return Array.from(combinedMap.values())
   }
 
   const registerMutation = trpc.workshops.register.useMutation({
@@ -184,7 +166,7 @@ export default function Workshops() {
     setShowAddParticipantForm(false)
   }
 
-  const removeParticipant = (workshopId: string, participantId: string) => {
+  const removeParticipant = (_workshopId: string, participantId: string) => {
     if (!usersModalWorkshop) return
     const currentList = getWorkshopParticipants(usersModalWorkshop)
     const target = currentList.find(p => p.id === participantId)
@@ -194,8 +176,6 @@ export default function Workshops() {
         email: target.email,
       })
     }
-    const updated = currentList.filter(p => p.id !== participantId)
-    setParticipantsMap(prev => ({ ...prev, [workshopId]: updated }))
   }
 
   const exportParticipantsCSV = (workshop: Workshop, list: Participant[]) => {

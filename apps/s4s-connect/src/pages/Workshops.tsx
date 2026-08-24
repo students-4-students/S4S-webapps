@@ -57,66 +57,47 @@ export default function Workshops() {
   const utils = trpc.useUtils()
   const user = useAuthStore((state) => state.user)
 
-  // Track favorited workshop IDs in local state / localStorage
-  const [favoriteIds, setFavoriteIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('s4s_favorite_workshops')
-      return saved ? JSON.parse(saved) : []
-    } catch {
-      return []
-    }
-  })
-
+  // Clean up any legacy localStorage cache on mount
   useEffect(() => {
     try {
-      localStorage.setItem('s4s_favorite_workshops', JSON.stringify(favoriteIds))
-    } catch (err) {
-      console.error('Failed to save favorites:', err)
-    }
-  }, [favoriteIds])
+      localStorage.removeItem('s4s_registered_slots')
+      localStorage.removeItem('s4s_registered_workshops')
+      localStorage.removeItem('s4s_favorite_workshops')
+    } catch {}
+  }, [])
 
-  // Track registered slots in local state / localStorage
-  const [registeredSlotIds, setRegisteredSlotIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('s4s_registered_slots')
-      if (saved) return JSON.parse(saved)
-      const oldSaved = localStorage.getItem('s4s_registered_workshops')
-      return oldSaved ? JSON.parse(oldSaved) : []
-    } catch {
-      return []
-    }
-  })
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('s4s_registered_slots', JSON.stringify(registeredSlotIds))
-    } catch (err) {
-      console.error('Failed to save registered slots:', err)
-    }
-  }, [registeredSlotIds])
-
-  // Fetch workshops with real DB registrations included
+  // Fetch workshops with real DB registrations and favorites included
   const { data: workshops = [], isLoading, error } = trpc.workshops.list.useQuery()
 
-  // Sync DB registrations into local registeredSlotIds state
-  useEffect(() => {
-    if (workshops.length > 0) {
-      const dbRegisteredIds: string[] = []
-      workshops.forEach((w: any) => {
-        (w.dates || []).forEach((d: any) => {
-          if (d.registrations && d.registrations.length > 0) {
-            const isUserReg = d.registrations.some((r: any) => r.sessionId === d.id || registeredSlotIds.includes(d.id))
-            if (isUserReg) {
-              dbRegisteredIds.push(d.id)
-            }
-          }
+  // Derive favorite workshop IDs directly for the current authenticated user from DB
+  const favoriteIds = useMemo(() => {
+    if (!user) return []
+    return workshops
+      .filter((w: any) => (w.favorites || []).some((f: any) => f.userId === user.id))
+      .map((w: any) => w.id)
+  }, [workshops, user])
+
+  // Derive registered slot IDs directly for the current authenticated user
+  const registeredSlotIds = useMemo(() => {
+    if (!user) return []
+    const ids: string[] = []
+    const userEmail = user.email?.trim().toLowerCase()
+    const userId = user.id
+
+    workshops.forEach((w: any) => {
+      (w.dates || []).forEach((d: any) => {
+        const isUserReg = (d.registrations || []).some((r: any) => {
+          if (userId && r.userId && r.userId === userId) return true
+          if (userEmail && r.email && r.email.trim().toLowerCase() === userEmail) return true
+          return false
         })
+        if (isUserReg) {
+          ids.push(d.id)
+        }
       })
-      if (dbRegisteredIds.length > 0) {
-        setRegisteredSlotIds((prev) => Array.from(new Set([...prev, ...dbRegisteredIds])))
-      }
-    }
-  }, [workshops])
+    })
+    return ids
+  }, [workshops, user])
 
   // Keep selected workshop in sync with fresh data
   useEffect(() => {
@@ -157,6 +138,13 @@ export default function Workshops() {
       setTimeout(() => setToastMessage(null), 3500)
     },
   })
+  const toggleFavoriteMutation = trpc.workshops.toggleFavorite.useMutation({
+    onSuccess: () => { utils.workshops.list.invalidate() },
+    onError: (err) => {
+      setToastMessage(err.message || 'Erreur lors de la mise à jour des favoris')
+      setTimeout(() => setToastMessage(null), 3500)
+    },
+  })
 
   // Real-time subscription
   trpc.workshops.onUpdated.useSubscription(undefined, {
@@ -172,39 +160,53 @@ export default function Workshops() {
   }
 
   const handleSlotRegisterToggle = (workshop: Workshop, session: WorkshopSession) => {
+    if (!user?.email) {
+      setToastMessage('Veuillez vous connecter pour vous inscrire à un atelier.')
+      setTimeout(() => setToastMessage(null), 3500)
+      return
+    }
+
     const isRegistered = registeredSlotIds.includes(session.id)
-    const userFirstName = user?.firstName || 'Alex'
-    const userLastName = user?.lastName || 'Richer'
-    const userEmail = user?.email || 'alex.richer@epfl.ch'
+    const userFirstName = user.firstName || 'Étudiant'
+    const userLastName = user.lastName || ''
+    const userEmail = user.email.trim()
 
     if (isRegistered) {
-      unregisterMutation.mutate({ sessionId: session.id, email: userEmail })
-      setRegisteredSlotIds((prev) => prev.filter((id) => id !== session.id))
-      setToastMessage(`Inscription annulée pour "${workshop.title}"`)
+      unregisterMutation.mutate(
+        { sessionId: session.id, email: userEmail },
+        {
+          onSuccess: () => {
+            setToastMessage(`Inscription annulée pour "${workshop.title}"`)
+            setTimeout(() => setToastMessage(null), 3500)
+          },
+        }
+      )
     } else {
-      registerMutation.mutate({ sessionId: session.id, firstName: userFirstName, lastName: userLastName, email: userEmail })
-      setRegisteredSlotIds((prev) => Array.from(new Set([...prev, session.id])))
-      setToastMessage(`Inscription réussie à "${workshop.title}" !`)
+      registerMutation.mutate(
+        { sessionId: session.id, firstName: userFirstName, lastName: userLastName, email: userEmail },
+        {
+          onSuccess: () => {
+            setToastMessage(`Inscription réussie à "${workshop.title}" !`)
+            setTimeout(() => setToastMessage(null), 3500)
+          },
+        }
+      )
     }
-    setTimeout(() => setToastMessage(null), 3500)
   }
 
   const toggleFavorite = (workshopId: string, e?: React.MouseEvent) => {
     if (e) {
       e.stopPropagation()
     }
-    setFavoriteIds((prev) => {
-      const isFav = prev.includes(workshopId)
-      if (isFav) {
-        setToastMessage('Retiré des favoris')
-        setTimeout(() => setToastMessage(null), 2500)
-        return prev.filter((id) => id !== workshopId)
-      } else {
-        setToastMessage('Ajouté aux favoris ❤️')
-        setTimeout(() => setToastMessage(null), 2500)
-        return [...prev, workshopId]
-      }
-    })
+    if (!user) {
+      setToastMessage('Veuillez vous connecter pour enregistrer vos favoris.')
+      setTimeout(() => setToastMessage(null), 2500)
+      return
+    }
+    const isFav = favoriteIds.includes(workshopId)
+    toggleFavoriteMutation.mutate({ workshopId })
+    setToastMessage(isFav ? 'Retiré des favoris' : 'Ajouté aux favoris ❤️')
+    setTimeout(() => setToastMessage(null), 2500)
   }
 
   // Filtered workshops

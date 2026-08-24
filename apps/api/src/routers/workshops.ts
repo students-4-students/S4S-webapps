@@ -12,6 +12,11 @@ export const workshopsRouter = router({
       orderBy: { createdAt: 'desc' },
       include: {
         room: true,
+        favorites: {
+          select: {
+            userId: true,
+          },
+        },
         dates: {
           orderBy: { startTime: 'asc' },
           include: {
@@ -366,6 +371,43 @@ export const workshopsRouter = router({
       })
       workshopEmitter.emit('updated')
       return reg
+    }),
+
+  toggleFavorite: protectedProcedure
+    .input(z.object({
+      workshopId: z.string(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const userId = (ctx.user as any)?.id
+      if (!userId) {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Utilisateur non authentifié' })
+      }
+
+      const existing = await ctx.db.workshopFavorite.findUnique({
+        where: {
+          userId_workshopId: {
+            userId,
+            workshopId: input.workshopId,
+          },
+        },
+      })
+
+      if (existing) {
+        await ctx.db.workshopFavorite.delete({
+          where: { id: existing.id },
+        })
+        workshopEmitter.emit('updated')
+        return { isFavorite: false }
+      } else {
+        await ctx.db.workshopFavorite.create({
+          data: {
+            userId,
+            workshopId: input.workshopId,
+          },
+        })
+        workshopEmitter.emit('updated')
+        return { isFavorite: true }
+      }
     }),
 
   onUpdated: protectedProcedure.subscription(async function* ({ signal }) {
