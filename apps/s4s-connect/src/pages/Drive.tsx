@@ -436,7 +436,7 @@ export default function Drive() {
                       className="drive-card file"
                       onClick={() => {
                         if (file.key && file.key.startsWith('/uploads/')) {
-                          window.open(`https://s4s-connect.students4students.ch${file.key}`, '_blank')
+                          window.open(`https://s4s-connect.students4students.ch/api${file.key}`, '_blank')
                         } else if (file.key && file.key.startsWith('data:')) {
                           const win = window.open()
                           if (win) {
@@ -444,7 +444,7 @@ export default function Drive() {
                             win.document.title = file.name
                           }
                         } else {
-                          window.open(`https://s4s-connect.students4students.ch/uploads/${file.key}`, '_blank')
+                          window.open(`https://s4s-connect.students4students.ch/api/uploads/${file.key}`, '_blank')
                         }
                       }}
                     >
