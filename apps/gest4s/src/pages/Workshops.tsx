@@ -34,6 +34,8 @@ interface Workshop {
   description: string
   image: string | null
   requiresRegistration: boolean
+  onlyOneSlotPerUser?: boolean
+  isRegistrationClosed?: boolean
   externalRegistrationUrl?: string | null
   maxParticipants: number | null
   dates: WorkshopSession[]
@@ -71,6 +73,8 @@ export default function Workshops() {
   const [description, setDescription] = useState('')
   const [image, setImage] = useState('')
   const [requiresRegistration, setRequiresRegistration] = useState(false)
+  const [onlyOneSlotPerUser, setOnlyOneSlotPerUser] = useState(false)
+  const [isRegistrationClosed, setIsRegistrationClosed] = useState(false)
   const [externalRegistrationUrl, setExternalRegistrationUrl] = useState('')
   const [maxParticipants, setMaxParticipants] = useState<number | ''>('')
   const [dates, setDates] = useState<{
@@ -314,6 +318,8 @@ export default function Workshops() {
     setImage('')
     setImageTab('file')
     setRequiresRegistration(false)
+    setOnlyOneSlotPerUser(false)
+    setIsRegistrationClosed(false)
     setExternalRegistrationUrl('')
     setMaxParticipants('')
     
@@ -356,6 +362,8 @@ export default function Workshops() {
     setImage(w.image || '')
     setImageTab(w.image && !w.image.startsWith('data:') ? 'url' : 'file')
     setRequiresRegistration(w.requiresRegistration)
+    setOnlyOneSlotPerUser(Boolean(w.onlyOneSlotPerUser))
+    setIsRegistrationClosed(Boolean(w.isRegistrationClosed))
     setExternalRegistrationUrl(w.externalRegistrationUrl || '')
     setMaxParticipants(w.maxParticipants ?? '')
     
@@ -561,6 +569,8 @@ export default function Workshops() {
       description: description.trim(),
       image: image.trim() || undefined,
       requiresRegistration,
+      onlyOneSlotPerUser: requiresRegistration ? onlyOneSlotPerUser : false,
+      isRegistrationClosed,
       externalRegistrationUrl: requiresRegistration && externalRegistrationUrl.trim() ? externalRegistrationUrl.trim() : null,
       maxParticipants: requiresRegistration && !externalRegistrationUrl.trim() && maxParticipants !== '' ? Number(maxParticipants) : null,
       dates: dates.map(d => {
@@ -782,7 +792,11 @@ export default function Workshops() {
                       </div>
                     )}
                     <div className="workshop-badge-row">
-                      {w.requiresRegistration ? (
+                      {w.isRegistrationClosed ? (
+                        <span className="badge badge-registration" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)' }}>
+                          🔒 Inscriptions closes
+                        </span>
+                      ) : w.requiresRegistration ? (
                         w.externalRegistrationUrl ? (
                           <a
                             href={w.externalRegistrationUrl}
@@ -802,6 +816,11 @@ export default function Workshops() {
                       ) : (
                         <span className="badge badge-open">
                           🟢 Entrée libre
+                        </span>
+                      )}
+                      {w.requiresRegistration && w.onlyOneSlotPerUser && (
+                        <span className="badge badge-registration" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
+                          1 créneau max
                         </span>
                       )}
                     </div>
@@ -976,6 +995,7 @@ export default function Workshops() {
                       if (!e.target.checked) {
                         setMaxParticipants('')
                         setExternalRegistrationUrl('')
+                        setOnlyOneSlotPerUser(false)
                       }
                     }}
                   />
@@ -984,6 +1004,15 @@ export default function Workshops() {
 
                 {requiresRegistration && (
                   <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <label className="checkbox-label" style={{ marginLeft: '1.25rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={onlyOneSlotPerUser}
+                        onChange={(e) => setOnlyOneSlotPerUser(e.target.checked)}
+                      />
+                      <span>Limiter à 1 seul créneau par participant pour cet atelier</span>
+                    </label>
+
                     <label className="sub-label">
                       Lien vers un formulaire externe (Google Forms, Typeform, etc.)
                       <input
@@ -999,7 +1028,7 @@ export default function Workshops() {
 
                     {!externalRegistrationUrl && (
                       <label className="sub-label">
-                        Nombre maximal de participants sur l'application (laisser vide si illimité)
+                        Nombre maximal de participants par créneau sur l'application (laisser vide si illimité)
                         <input
                           type="number"
                           min={1}
@@ -1011,6 +1040,17 @@ export default function Workshops() {
                     )}
                   </div>
                 )}
+
+                <div style={{ marginTop: '0.75rem', borderTop: '1px solid var(--ws-border)', paddingTop: '0.75rem' }}>
+                  <label className="checkbox-label" style={{ color: isRegistrationClosed ? '#f87171' : 'inherit' }}>
+                    <input
+                      type="checkbox"
+                      checked={isRegistrationClosed}
+                      onChange={(e) => setIsRegistrationClosed(e.target.checked)}
+                    />
+                    <span>🔒 Clôturer les inscriptions (l'atelier reste visible mais les inscriptions sont bloquées)</span>
+                  </label>
+                </div>
               </div>
 
               {/* Image Input Section */}

@@ -44,6 +44,8 @@ export const workshopsRouter = router({
       description: z.string().min(1),
       image: z.string().optional(),
       requiresRegistration: z.boolean().default(false),
+      onlyOneSlotPerUser: z.boolean().default(false),
+      isRegistrationClosed: z.boolean().default(false),
       externalRegistrationUrl: z.string().nullable().optional(),
       maxParticipants: z.number().nullable().optional(),
       dates: z.array(z.object({
@@ -91,6 +93,8 @@ export const workshopsRouter = router({
       description: z.string().min(1).optional(),
       image: z.string().optional(),
       requiresRegistration: z.boolean().optional(),
+      onlyOneSlotPerUser: z.boolean().optional(),
+      isRegistrationClosed: z.boolean().optional(),
       externalRegistrationUrl: z.string().nullable().optional(),
       maxParticipants: z.number().nullable().optional(),
       dates: z.array(z.object({
@@ -296,6 +300,13 @@ export const workshopsRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Session introuvable' })
       }
 
+      if (session.workshop.isRegistrationClosed) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Les inscriptions pour cet atelier sont actuellement closes.',
+        })
+      }
+
       if (session.workshop.requiresRegistration && session.workshop.maxParticipants) {
         if (session.registrations.length >= session.workshop.maxParticipants) {
           throw new TRPCError({ code: 'BAD_REQUEST', message: 'Ce créneau est complet' })
@@ -307,8 +318,8 @@ export const workshopsRouter = router({
       const firstName = input.firstName || (ctx.user as any)?.firstName || 'Étudiant'
       const lastName = input.lastName || (ctx.user as any)?.lastName || 'Inscrit'
 
-      // Check existing registration to avoid duplicates
-      const existing = await ctx.db.workshopRegistration.findFirst({
+      // Check if already registered to this session
+      const existingInSession = await ctx.db.workshopRegistration.findFirst({
         where: {
           sessionId: input.sessionId,
           OR: [
@@ -318,8 +329,30 @@ export const workshopsRouter = router({
         },
       })
 
-      if (existing) {
-        return existing
+      if (existingInSession) {
+        return existingInSession
+      }
+
+      // If workshop limits users to 1 slot, verify if already registered to any session of this workshop
+      if (session.workshop.onlyOneSlotPerUser) {
+        const existingInWorkshop = await ctx.db.workshopRegistration.findFirst({
+          where: {
+            session: {
+              workshopId: session.workshopId,
+            },
+            OR: [
+              userId ? { userId } : undefined,
+              { email },
+            ].filter(Boolean) as any,
+          },
+        })
+
+        if (existingInWorkshop) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Vous êtes déjà inscrit(e) à un créneau pour cet atelier (limité à 1 créneau par participant).',
+          })
+        }
       }
 
       const registration = await ctx.db.workshopRegistration.create({

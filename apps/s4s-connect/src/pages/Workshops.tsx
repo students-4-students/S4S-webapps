@@ -40,6 +40,8 @@ interface Workshop {
   description: string
   image: string | null
   requiresRegistration: boolean
+  onlyOneSlotPerUser?: boolean
+  isRegistrationClosed?: boolean
   externalRegistrationUrl?: string | null
   maxParticipants: number | null
   dates: WorkshopSession[]
@@ -182,6 +184,23 @@ export default function Workshops() {
         }
       )
     } else {
+      if (workshop.isRegistrationClosed) {
+        setToastMessage('Les inscriptions pour cet atelier sont actuellement closes.')
+        setTimeout(() => setToastMessage(null), 3500)
+        return
+      }
+
+      if (workshop.onlyOneSlotPerUser) {
+        const hasOtherReg = (workshop.dates || []).some(
+          (d) => d.id !== session.id && registeredSlotIds.includes(d.id)
+        )
+        if (hasOtherReg) {
+          setToastMessage('Vous êtes déjà inscrit(e) à un autre créneau pour cet atelier.')
+          setTimeout(() => setToastMessage(null), 3500)
+          return
+        }
+      }
+
       registerMutation.mutate(
         { sessionId: session.id, firstName: userFirstName, lastName: userLastName, email: userEmail },
         {
@@ -454,6 +473,10 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
   const displayedDates = sortedDates.slice(0, 3)
   const hiddenCount = sortedDates.length - displayedDates.length
 
+  const hasWorkshopReg = useMemo(() => {
+    return (w.dates || []).some((d) => registeredSlotIds.includes(d.id))
+  }, [w.dates, registeredSlotIds])
+
   return (
     <div className="workshop-connect-card" onClick={onClick} style={{ cursor: 'pointer' }}>
       <div className="workshop-card-image-wrap">
@@ -463,7 +486,11 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
           <div className="workshop-card-placeholder"><span>🎨</span></div>
         )}
         <div className="workshop-badge-container">
-          {w.requiresRegistration ? (
+          {w.isRegistrationClosed ? (
+            <span className="badge-reg required" style={{ background: 'rgba(239, 68, 68, 0.25)', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.5)' }}>
+              🔒 Inscriptions closes
+            </span>
+          ) : w.requiresRegistration ? (
             w.externalRegistrationUrl ? (
               <span className="badge-reg external">🔗 Formulaire externe</span>
             ) : (
@@ -471,6 +498,11 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
             )
           ) : (
             <span className="badge-reg open">Entrée libre</span>
+          )}
+          {w.requiresRegistration && w.onlyOneSlotPerUser && !w.isRegistrationClosed && (
+            <span className="badge-reg" style={{ background: 'rgba(168, 85, 247, 0.25)', color: '#c084fc', borderColor: 'rgba(168, 85, 247, 0.4)' }}>
+              1 créneau max
+            </span>
           )}
           {/* Favorite button absolute over image */}
           <button className={`workshop-fav-btn ${isFavorite ? 'active' : ''}`} onClick={onFavoriteToggle} aria-label="Ajouter aux favoris">
@@ -505,6 +537,11 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
                 const isReg = registeredSlotIds.includes(d.id)
                 const spots = getSlotAvailableSpots(d, w.maxParticipants)
                 const isPast = new Date(d.endTime).getTime() < Date.now()
+                const isClosed = Boolean(w.isRegistrationClosed)
+                const isBlockedByOtherSlot = !isReg && Boolean(w.onlyOneSlotPerUser) && hasWorkshopReg
+
+                const isDisabled = isPast || (isClosed && !isReg) || isBlockedByOtherSlot || (spots !== null && spots.available === 0 && !isReg)
+
                 return (
                   <div key={d.id} className={`slot-option-card ${isReg ? 'registered' : ''} ${isPast ? 'past' : ''}`} onClick={(e) => e.stopPropagation()}>
                     <div className="slot-info">
@@ -515,6 +552,8 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
                       <div className="slot-spots-badge">
                         {isPast ? (
                           <span className="spots-tag past">Terminé</span>
+                        ) : isClosed ? (
+                          <span className="spots-tag full" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171' }}>Clôturé</span>
                         ) : w.externalRegistrationUrl ? (
                           <span className="spots-tag open" style={{ background: 'rgba(37, 99, 235, 0.15)', color: '#60a5fa' }}>Lien externe</span>
                         ) : spots === null ? (
@@ -541,13 +580,28 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
                     ) : (
                       <button
                         className={`btn-slot-register ${isReg ? 'registered' : ''}`}
-                        disabled={isPast || (spots !== null && spots.available === 0 && !isReg)}
+                        disabled={isDisabled}
+                        title={
+                          isPast
+                            ? 'Créneau terminé'
+                            : isClosed && !isReg
+                            ? 'Inscriptions closes'
+                            : isBlockedByOtherSlot
+                            ? 'Vous êtes déjà inscrit(e) à un autre créneau'
+                            : spots !== null && spots.available === 0 && !isReg
+                            ? 'Complet'
+                            : undefined
+                        }
                         onClick={(e) => { e.stopPropagation(); onRegisterToggle(w, d) }}
                       >
                         {isPast ? (
                           <span>Terminé</span>
                         ) : isReg ? (
                           <><span className="reg-icon">✓</span><span className="reg-status-label">Inscrit(e)</span><span className="reg-hover-label">Désinscrire</span></>
+                        ) : isClosed ? (
+                          <span>Clos</span>
+                        ) : isBlockedByOtherSlot ? (
+                          <span>Déjà inscrit</span>
                         ) : spots !== null && spots.available === 0 ? (
                           <span>Complet</span>
                         ) : (
@@ -594,6 +648,9 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
     })
 
   const isFavorite = favoriteIds.includes(w.id)
+  const hasWorkshopReg = useMemo(() => {
+    return (w.dates || []).some((d) => registeredSlotIds.includes(d.id))
+  }, [w.dates, registeredSlotIds])
 
   return (
     <div className="workshop-detail-overlay" onClick={onClose}>
@@ -618,7 +675,11 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
           </button>
 
           <div className="detail-header-content">
-            {w.requiresRegistration ? (
+            {w.isRegistrationClosed ? (
+              <span className="badge-reg required" style={{ background: 'rgba(239, 68, 68, 0.25)', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.5)' }}>
+                🔒 Inscriptions closes
+              </span>
+            ) : w.requiresRegistration ? (
               w.externalRegistrationUrl ? (
                 <span className="badge-reg external">🔗 Formulaire externe</span>
               ) : (
@@ -626,6 +687,11 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
               )
             ) : (
               <span className="badge-reg open">Entrée libre</span>
+            )}
+            {w.requiresRegistration && w.onlyOneSlotPerUser && !w.isRegistrationClosed && (
+              <span className="badge-reg" style={{ background: 'rgba(168, 85, 247, 0.25)', color: '#c084fc', borderColor: 'rgba(168, 85, 247, 0.4)' }}>
+                1 créneau max par participant
+              </span>
             )}
           </div>
         </div>
@@ -648,6 +714,26 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
           </div>
 
           <p className="detail-description">{w.description}</p>
+
+          {/* Registration closed banner */}
+          {w.isRegistrationClosed && (
+            <div style={{ margin: '1rem 0', padding: '0.9rem 1.1rem', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.35)', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <span style={{ fontSize: '1.2rem' }}>🔒</span>
+              <div style={{ fontSize: '0.86rem', color: '#fca5a5' }}>
+                <strong>Inscriptions closes :</strong> Les inscriptions pour cet atelier ne sont plus acceptées pour le moment.
+              </div>
+            </div>
+          )}
+
+          {/* 1-slot limit banner */}
+          {!w.isRegistrationClosed && w.requiresRegistration && w.onlyOneSlotPerUser && (
+            <div style={{ margin: '0.75rem 0', padding: '0.75rem 1rem', background: 'rgba(168, 85, 247, 0.1)', border: '1px solid rgba(168, 85, 247, 0.25)', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <span style={{ fontSize: '1rem' }}>ℹ️</span>
+              <div style={{ fontSize: '0.82rem', color: '#d8b4fe' }}>
+                Cet atelier est limité à <strong>1 seul créneau</strong> par étudiant afin de permettre à un maximum de personnes d'y participer.
+              </div>
+            </div>
+          )}
 
           {/* External registration banner */}
           {w.externalRegistrationUrl && (
@@ -679,12 +765,19 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
                   const isReg = registeredSlotIds.includes(d.id)
                   const spots = getSlotAvailableSpots(d, w.maxParticipants)
                   const isPast = new Date(d.endTime).getTime() < Date.now()
+                  const isClosed = Boolean(w.isRegistrationClosed)
+                  const isBlockedByOtherSlot = !isReg && Boolean(w.onlyOneSlotPerUser) && hasWorkshopReg
+
+                  const isDisabled = isPast || (isClosed && !isReg) || isBlockedByOtherSlot || (spots !== null && spots.available === 0 && !isReg)
+
                   return (
                     <div key={d.id} className={`detail-slot-card ${isReg ? 'registered' : ''} ${isPast ? 'past' : ''}`}>
                       <div className="detail-slot-header">
                         <span className="detail-slot-num">Créneau {idx + 1}</span>
                         {isPast ? (
                           <span className="spots-tag past">Terminé</span>
+                        ) : isClosed ? (
+                          <span className="spots-tag full" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171' }}>Clôturé</span>
                         ) : w.externalRegistrationUrl ? (
                           <span className="spots-tag open" style={{ background: 'rgba(37, 99, 235, 0.15)', color: '#60a5fa' }}>Lien externe</span>
                         ) : spots === null ? (
@@ -719,13 +812,17 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
                         ) : (
                           <button
                             className={`detail-slot-btn ${isReg ? 'registered' : ''}`}
-                            disabled={spots !== null && spots.available === 0 && !isReg}
+                            disabled={isDisabled}
                             onClick={() => onRegisterToggle(w, d)}
                           >
                             {isPast ? (
                               <span>Créneau terminé</span>
                             ) : isReg ? (
                               <><span>✓ Inscrit(e)</span><span className="detail-slot-btn-hover">Annuler l'inscription</span></>
+                            ) : isClosed ? (
+                              <span>Inscriptions closes</span>
+                            ) : isBlockedByOtherSlot ? (
+                              <span>Déjà inscrit(e) à un créneau</span>
                             ) : spots !== null && spots.available === 0 ? (
                               <span>Complet</span>
                             ) : (

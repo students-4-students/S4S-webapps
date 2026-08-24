@@ -358,6 +358,8 @@ model Workshop {
   description             String
   image                   String?           // image URL or path
   requiresRegistration    Boolean           @default(false)
+  onlyOneSlotPerUser      Boolean           @default(false)   // User can only register to 1 slot of this workshop
+  isRegistrationClosed    Boolean           @default(false)   // Registrations closed by admin
   externalRegistrationUrl String?           // URL to external registration form (Google Form, etc.)
   maxParticipants         Int?              // Null means unlimited or not applicable
   dates                   WorkshopSession[]
