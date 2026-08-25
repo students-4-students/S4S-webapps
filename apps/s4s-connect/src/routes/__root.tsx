@@ -35,7 +35,7 @@ function RootLayout() {
 
           <div className="header-brand">
             <a href="tel:+41216938561" className="dispatch-link">
-              <span className="dispatch-number">+41 21 69 38 5 61</span>
+              <span className="dispatch-number">+41 21 693 85 61</span>
             </a>
           </div>
           
