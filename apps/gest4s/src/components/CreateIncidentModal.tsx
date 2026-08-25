@@ -2,7 +2,15 @@ import React, { useState } from 'react'
 import { trpc } from '../trpc'
 import { Modal, Input, Select, Button } from '@s4s/ui'
 
-const defaultForm = { title: '', description: '', location: '', category: '', severity: 'LOW' as const }
+const defaultForm = {
+  title: '',
+  description: '',
+  location: '',
+  category: '',
+  severity: 'LOW' as const,
+  contactPerson: '',
+  keyNumber: '',
+}
 
 interface Props {
   onClose: () => void
@@ -33,6 +41,8 @@ function CreateIncidentModal({ onClose, defaultTitle = '', defaultLocation = '' 
       location: form.location || undefined,
       category: form.category || undefined,
       severity: form.severity,
+      contactPerson: form.contactPerson || undefined,
+      keyNumber: form.keyNumber || undefined,
     })
   }
 
@@ -57,10 +67,25 @@ function CreateIncidentModal({ onClose, defaultTitle = '', defaultLocation = '' 
           />
         </div>
 
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <Input
+            label="Lieu"
+            value={form.location}
+            onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+          />
+          <Input
+            label="Personne de contact"
+            placeholder="Ex: Jean Dupont"
+            value={form.contactPerson}
+            onChange={(e) => setForm((f) => ({ ...f, contactPerson: e.target.value }))}
+          />
+        </div>
+
         <Input
-          label="Lieu"
-          value={form.location}
-          onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+          label="Numéro de clé (si remise)"
+          placeholder="Ex: Clé n° 12..."
+          value={form.keyNumber}
+          onChange={(e) => setForm((f) => ({ ...f, keyNumber: e.target.value }))}
         />
 
         <Select

@@ -22,6 +22,8 @@ export const incidentsRouter = router({
       location: z.string().optional(),
       category: z.string().optional(),
       severity: z.enum(['LOW', 'MEDIUM', 'HIGH']).default('LOW'),
+      contactPerson: z.string().optional(),
+      keyNumber: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const incident = await ctx.db.incident.create({
@@ -53,6 +55,8 @@ export const incidentsRouter = router({
       category: z.string().optional(),
       severity: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
       status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED']).optional(),
+      contactPerson: z.string().nullable().optional(),
+      keyNumber: z.string().nullable().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const { id, ...data } = input

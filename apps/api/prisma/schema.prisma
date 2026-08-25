@@ -129,18 +129,20 @@ model TaskAssignment {
 }
 
 model Incident {
-  id           String         @id @default(uuid())
-  title        String
-  description  String
-  severity     Severity       @default(LOW)
-  status       IncidentStatus @default(OPEN)
-  reportedById String
-  createdAt    DateTime       @default(now())
-  category     String?
-  location     String?
-  updatedAt    DateTime       @updatedAt
-  reportedBy   User           @relation("ReportedIncidents", fields: [reportedById], references: [id])
-  assignedTo   User[]         @relation("AssignedIncidents")
+  id            String         @id @default(uuid())
+  title         String
+  description   String
+  severity      Severity       @default(LOW)
+  status        IncidentStatus @default(OPEN)
+  reportedById  String
+  createdAt     DateTime       @default(now())
+  category      String?
+  location      String?
+  contactPerson String?
+  keyNumber     String?
+  updatedAt     DateTime       @updatedAt
+  reportedBy    User           @relation("ReportedIncidents", fields: [reportedById], references: [id])
+  assignedTo    User[]         @relation("AssignedIncidents")
 }
 
 model Poll {

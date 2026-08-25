@@ -37,6 +37,8 @@ function IncidentDetail() {
     category: '',
     severity: 'LOW' as 'LOW' | 'MEDIUM' | 'HIGH',
     status: 'OPEN' as 'OPEN' | 'IN_PROGRESS' | 'RESOLVED',
+    contactPerson: '',
+    keyNumber: '',
   })
 
   useEffect(() => {
@@ -48,6 +50,8 @@ function IncidentDetail() {
         category: incident.category ?? '',
         severity: incident.severity,
         status: incident.status,
+        contactPerson: incident.contactPerson ?? '',
+        keyNumber: incident.keyNumber ?? '',
       })
     }
   }, [incident])
@@ -62,6 +66,8 @@ function IncidentDetail() {
       category: form.category || undefined,
       severity: form.severity,
       status: form.status,
+      contactPerson: form.contactPerson || null,
+      keyNumber: form.keyNumber || null,
     })
   }
 
@@ -113,6 +119,26 @@ function IncidentDetail() {
               <input
                 value={form.location}
                 onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+              />
+            </label>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.875rem', fontWeight: 500 }}>
+              Personne de contact
+              <input
+                placeholder="Ex: Jean Dupont (079...)"
+                value={form.contactPerson}
+                onChange={(e) => setForm((f) => ({ ...f, contactPerson: e.target.value }))}
+              />
+            </label>
+
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.875rem', fontWeight: 500 }}>
+              Numéro de clé (si remise)
+              <input
+                placeholder="Ex: 104, B12..."
+                value={form.keyNumber}
+                onChange={(e) => setForm((f) => ({ ...f, keyNumber: e.target.value }))}
               />
             </label>
           </div>

@@ -118,6 +118,8 @@ function IncidentCard({ incident, showDelete=true }: { incident: Incident; showD
           </span>
           {incident.location && <span>· {incident.location}</span>}
           {incident.category && <span>· {incident.category}</span>}
+          {incident.contactPerson && <span>· 👤 {incident.contactPerson}</span>}
+          {incident.keyNumber && <span>· 🔑 Clé n°{incident.keyNumber}</span>}
           <span style={{ marginLeft: 'auto' }}>
             {incident.reportedBy.firstName} {incident.reportedBy.lastName}
           </span>
