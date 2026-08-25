@@ -68,3 +68,40 @@ button:hover {
     width: 100%;
     height: 100%;
 }
+
+/* ==================== */
+/* Header Navigation    */
+/* ==================== */
+
+.nav-menu {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    overflow-x: auto;
+    max-width: calc(100vw - 200px);
+    padding: 2px;
+}
+
+.nav-tab {
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #4b5563;
+    padding: 0.4rem 0.8rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.nav-tab:hover {
+    color: var(--primary-purple);
+    background-color: rgba(65, 51, 95, 0.08);
+}
+
+.nav-tab.active {
+    color: #ffffff;
+    background-color: var(--primary-purple);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(65, 51, 95, 0.25);
+}

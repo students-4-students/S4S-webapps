@@ -1,21 +1,15 @@
-import { useLocation } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
+import '../../styles/app.css'
 
 const NAV_ITEMS = [
   { path: '/', label: 'Dashboard' },
   { path: '/schedule', label: 'Planning' },
-  { path: '/operations', label: 'Opérations' },
-  { path: '/rooms', label: 'Salles' },
-  { path: '/workshops', label: 'Workshops' },
   { path: '/staffs', label: 'Staff' },
   { path: '/students', label: 'Étudiants' },
   { path: '/incidents', label: 'Incidents' },
-  { path: '/feedback', label: 'Sondages' },
-  { path: '/scan', label: '📷 Scan' },
 ]
 
 export function AppHeader() {
-  const { pathname } = useLocation()
-
   return (
     <header style={{
       position: 'fixed',
@@ -33,33 +27,40 @@ export function AppHeader() {
       WebkitBackdropFilter: 'blur(12px)',
       borderBottom: '1px solid rgba(0,0,0,0.08)',
       boxShadow: '0 1px 8px rgba(0,0,0,0.06)',
+      gap: '12px',
     }}>
       {/* Left: AGEPoly logo */}
-      <img
-        src='/agep.svg'
-        alt='AGEPoly'
-        style={{ height: '44px', width: 'auto', objectFit: 'contain' }}
-      />
+      <Link to='/' style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+        <img
+          src='/agep.svg'
+          alt='AGEPoly'
+          style={{ height: '44px', width: 'auto', objectFit: 'contain' }}
+        />
+      </Link>
 
-      {/* Center: page title */}
-      <h1 style={{
-        margin: 0,
-        fontSize: '1.15rem',
-        fontWeight: 700,
-        letterSpacing: '0.01em',
-        color: '#1e293b',
-        textAlign: 'center',
-        flex: 1,
-      }}>
-        {NAV_ITEMS.find(item => item.path === pathname)?.label || ''}
-      </h1>
+      {/* Center: Navigation Menu */}
+      <nav className='nav-menu'>
+        {NAV_ITEMS.map((item) => (
+          <Link
+            key={item.path}
+            to={item.path}
+            activeOptions={{ exact: item.path === '/' }}
+            className='nav-tab'
+            activeProps={{ className: 'nav-tab active' }}
+          >
+            {item.label}
+          </Link>
+        ))}
+      </nav>
 
       {/* Right: S4S logo */}
-      <img
-        src='/s4s-logo.svg'
-        alt='Students 4 Students'
-        style={{ height: '44px', width: 'auto', objectFit: 'contain' }}
-      />
+      <Link to='/' style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+        <img
+          src='/s4s-logo.svg'
+          alt='Students 4 Students'
+          style={{ height: '44px', width: 'auto', objectFit: 'contain' }}
+        />
+      </Link>
     </header>
   )
 }
