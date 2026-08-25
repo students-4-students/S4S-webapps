@@ -39,6 +39,7 @@ export default function Gest4SFeedback() {
   const [surveyTitle, setSurveyTitle] = useState('')
   const [surveyDescription, setSurveyDescription] = useState('')
   const [surveyActive, setSurveyActive] = useState(true)
+  const [surveyAvailableAt, setSurveyAvailableAt] = useState('')
   const [pages, setPages] = useState<PageForm[]>([
     {
       title: 'Page 1',
@@ -54,6 +55,19 @@ export default function Gest4SFeedback() {
       ],
     },
   ])
+
+  const formatDatetimeForInput = (dateVal?: string | Date | null) => {
+    if (!dateVal) return ''
+    const d = new Date(dateVal)
+    if (isNaN(d.getTime())) return ''
+    const pad = (n: number) => n.toString().padStart(2, '0')
+    const year = d.getFullYear()
+    const month = pad(d.getMonth() + 1)
+    const day = pad(d.getDate())
+    const hours = pad(d.getHours())
+    const minutes = pad(d.getMinutes())
+    return `${year}-${month}-${day}T${hours}:${minutes}`
+  }
 
   const utils = trpc.useUtils()
 
@@ -107,6 +121,7 @@ export default function Gest4SFeedback() {
     setSurveyTitle('')
     setSurveyDescription('')
     setSurveyActive(true)
+    setSurveyAvailableAt('')
     setPages([
       {
         title: 'Page 1',
@@ -130,6 +145,7 @@ export default function Gest4SFeedback() {
     setSurveyTitle(survey.title)
     setSurveyDescription(survey.description || '')
     setSurveyActive(survey.active)
+    setSurveyAvailableAt(formatDatetimeForInput(survey.availableAt))
     setPages(
       survey.pages.map((p: any) => ({
         id: p.id,
@@ -304,6 +320,7 @@ export default function Gest4SFeedback() {
       title: surveyTitle.trim(),
       description: surveyDescription.trim() || undefined,
       active: surveyActive,
+      availableAt: surveyAvailableAt ? new Date(surveyAvailableAt).toISOString() : null,
       pages: pages.map((p) => ({
         title: p.title.trim(),
         description: p.description?.trim() || undefined,
@@ -419,15 +436,23 @@ export default function Gest4SFeedback() {
                 0
               )
               const responseCount = survey._count?.responses || 0
+              const isScheduledFuture = survey.availableAt && new Date(survey.availableAt) > new Date()
 
               return (
                 <div key={survey.id} className="survey-card">
                   <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center', marginBottom: '0.75rem' }}>
                       <span className={`survey-badge ${survey.active ? 'active' : 'inactive'}`}>
                         {survey.active ? '🟢 Actif' : '⚪ Inactif'}
                       </span>
-                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.8)', background: 'rgba(255,255,255,0.1)', padding: '3px 10px', borderRadius: '6px', fontWeight: 600 }}>
+                      {survey.availableAt && (
+                        <span className={`survey-badge ${isScheduledFuture ? 'scheduled' : 'active'}`}>
+                          {isScheduledFuture
+                            ? `⏳ Programmé : ${new Date(survey.availableAt).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+                            : `🌐 Public depuis : ${new Date(survey.availableAt).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`}
+                        </span>
+                      )}
+                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.8)', background: 'rgba(255,255,255,0.1)', padding: '3px 10px', borderRadius: '6px', fontWeight: 600, marginLeft: 'auto' }}>
                         🎓 Étudiants
                       </span>
                     </div>
@@ -532,9 +557,24 @@ export default function Gest4SFeedback() {
                 {analyticsSurvey.description && (
                   <p style={{ margin: '0 0 1rem 0', color: 'rgba(255,255,255,0.75)' }}>{analyticsSurvey.description}</p>
                 )}
-                <div style={{ display: 'flex', gap: '2rem', fontSize: '1rem', color: 'rgba(255,255,255,0.85)' }}>
+                <div style={{ display: 'flex', gap: '2rem', fontSize: '1rem', color: 'rgba(255,255,255,0.85)', flexWrap: 'wrap' }}>
                   <div>Total étudiants participants: <strong style={{ color: '#ff66b3' }}>{analyticsSurvey._count?.responses || 0}</strong></div>
                   <div>Statut: <strong>{analyticsSurvey.active ? 'Actif 🟢' : 'Inactif ⚪'}</strong></div>
+                  {analyticsSurvey.availableAt && (
+                    <div>
+                      Publication:{' '}
+                      <strong style={{ color: new Date(analyticsSurvey.availableAt) > new Date() ? '#fbbf24' : '#34d399' }}>
+                        {new Date(analyticsSurvey.availableAt) > new Date() ? '⏳ Programmé pour le ' : '🌐 Publié le '}
+                        {new Date(analyticsSurvey.availableAt).toLocaleString('fr-FR', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </strong>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -675,6 +715,31 @@ export default function Gest4SFeedback() {
                   boxSizing: 'border-box',
                 }}
               />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', color: '#ffffff', fontWeight: 600, marginBottom: '4px' }}>
+                Date et heure de publication (Optionnel)
+              </label>
+              <input
+                type="datetime-local"
+                value={surveyAvailableAt}
+                onChange={(e) => setSurveyAvailableAt(e.target.value)}
+                style={{
+                  width: '100%',
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  color: '#ffffff',
+                  border: '1px solid rgba(238, 212, 241, 0.2)',
+                  padding: '0.6rem 0.8rem',
+                  borderRadius: '8px',
+                  fontSize: '0.9rem',
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                }}
+              />
+              <span style={{ display: 'block', fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.6)', marginTop: '0.35rem' }}>
+                Laissez vide pour rendre le sondage public immédiatement. Si une date et heure sont configurées, les étudiants ne pourront voir et remplir ce sondage qu'à partir de ce moment.
+              </span>
             </div>
 
             {/* Pages Section */}

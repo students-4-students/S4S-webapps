@@ -40,9 +40,18 @@ export const feedbackRouter = router({
   // List all surveys (for users, active ones or assigned ones; for admin all)
   list: protectedProcedure.query(async ({ ctx }) => {
     const isAdmin = ctx.user.role === 'ADMIN'
+    const now = new Date()
     
     return ctx.db.survey.findMany({
-      where: isAdmin ? undefined : { active: true },
+      where: isAdmin
+        ? undefined
+        : {
+            active: true,
+            OR: [
+              { availableAt: null },
+              { availableAt: { lte: now } },
+            ],
+          },
       orderBy: { createdAt: 'desc' },
       include: {
         pages: {
@@ -77,6 +86,7 @@ export const feedbackRouter = router({
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
+      const isAdmin = ctx.user.role === 'ADMIN'
       const survey = await ctx.db.survey.findUnique({
         where: { id: input.id },
         include: {
@@ -107,6 +117,18 @@ export const feedbackRouter = router({
 
       if (!survey) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Sondage introuvable' })
+      }
+
+      if (!isAdmin) {
+        if (!survey.active) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: "Ce sondage n'est pas actif." })
+        }
+        if (survey.availableAt && new Date(survey.availableAt) > new Date()) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: `Ce sondage sera disponible le ${new Date(survey.availableAt).toLocaleString('fr-FR')}.`,
+          })
+        }
       }
 
       return survey
@@ -181,6 +203,7 @@ export const feedbackRouter = router({
         title: z.string().min(1),
         description: z.string().optional(),
         active: z.boolean().default(true),
+        availableAt: z.string().optional().nullable(),
         pages: z.array(PageInput).min(1, 'Le sondage doit comporter au moins une page'),
       })
     )
@@ -190,6 +213,7 @@ export const feedbackRouter = router({
           title: input.title,
           description: input.description,
           active: input.active,
+          availableAt: input.availableAt ? new Date(input.availableAt) : null,
           pages: {
             create: input.pages.map((page, pageIdx) => ({
               title: page.title,
@@ -238,6 +262,7 @@ export const feedbackRouter = router({
         title: z.string().min(1),
         description: z.string().optional(),
         active: z.boolean(),
+        availableAt: z.string().optional().nullable(),
         pages: z.array(PageInput).min(1, 'Le sondage doit comporter au moins une page'),
       })
     )
@@ -253,6 +278,7 @@ export const feedbackRouter = router({
           title: input.title,
           description: input.description,
           active: input.active,
+          availableAt: input.availableAt ? new Date(input.availableAt) : null,
           pages: {
             create: input.pages.map((page, pageIdx) => ({
               title: page.title,
@@ -334,6 +360,27 @@ export const feedbackRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user.id
+      const isAdmin = ctx.user.role === 'ADMIN'
+
+      const survey = await ctx.db.survey.findUnique({
+        where: { id: input.surveyId },
+      })
+
+      if (!survey) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Sondage introuvable' })
+      }
+
+      if (!isAdmin) {
+        if (!survey.active) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: "Ce sondage n'est pas actif." })
+        }
+        if (survey.availableAt && new Date(survey.availableAt) > new Date()) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: `Ce sondage sera disponible le ${new Date(survey.availableAt).toLocaleString('fr-FR')}.`,
+          })
+        }
+      }
 
       // Check existing response
       const existing = await ctx.db.surveyResponse.findUnique({
