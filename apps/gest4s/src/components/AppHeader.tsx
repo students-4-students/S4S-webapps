@@ -1,4 +1,5 @@
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { useAuthStore } from '../store/auth'
 import '../../styles/app.css'
 
 const NAV_ITEMS = [
@@ -10,6 +11,15 @@ const NAV_ITEMS = [
 ]
 
 export function AppHeader() {
+  const user = useAuthStore((s) => s.user)
+  const logout = useAuthStore((s) => s.logout)
+  const navigate = useNavigate()
+
+  const handleLogout = () => {
+    logout()
+    navigate({ to: '/' })
+  }
+
   return (
     <header style={{
       position: 'fixed',
@@ -53,14 +63,59 @@ export function AppHeader() {
         ))}
       </nav>
 
-      {/* Right: S4S logo */}
-      <Link to='/' style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-        <img
-          src='/s4s-logo.svg'
-          alt='Students 4 Students'
-          style={{ height: '44px', width: 'auto', objectFit: 'contain' }}
-        />
-      </Link>
+      {/* Right: S4S logo + User profile & Logout */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0 }}>
+        {user && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.2 }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--primary-purple-dark)' }}>
+                {user.firstName} {user.lastName}
+              </span>
+              <span style={{ fontSize: '0.72rem', color: '#6b7280', textTransform: 'capitalize' }}>
+                {user.role.toLowerCase()}
+              </span>
+            </div>
+
+            <button
+              type='button'
+              onClick={handleLogout}
+              title='Déconnexion'
+              style={{
+                margin: 0,
+                padding: '0.4rem 0.75rem',
+                fontSize: '0.82rem',
+                fontWeight: 500,
+                borderRadius: '0.5rem',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                background: 'rgba(239, 68, 68, 0.08)',
+                color: '#dc2626',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#dc2626'
+                e.currentTarget.style.color = '#ffffff'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'
+                e.currentTarget.style.color = '#dc2626'
+              }}
+            >
+              <span>Déconnexion</span>
+            </button>
+            <Link to='/' style={{ display: 'flex', alignItems: 'center' }}>
+              <img
+                src='/s4s-logo.svg'
+                alt='Students 4 Students'
+                style={{ height: '40px', width: 'auto', objectFit: 'contain' }}
+              />
+            </Link>
+          </div>
+        )}
+      </div>
     </header>
   )
 }
