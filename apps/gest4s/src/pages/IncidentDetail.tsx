@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { trpc } from '../trpc'
+import StaffCombobox from '../components/StaffCombobox'
 import '../../styles/dashboard.css'
 
 const SEVERITY_COLOR: Record<string, string> = {
@@ -36,9 +37,10 @@ function IncidentDetail() {
     location: '',
     category: '',
     severity: 'LOW' as 'LOW' | 'MEDIUM' | 'HIGH',
-    status: 'OPEN' as 'OPEN' | 'IN_PROGRESS' | 'RESOLVED',
+    status: 'IN_PROGRESS' as 'IN_PROGRESS' | 'RESOLVED',
     contactPerson: '',
     keyNumber: '',
+    assignedStaffIds: [] as string[],
   })
 
   useEffect(() => {
@@ -52,6 +54,7 @@ function IncidentDetail() {
         status: incident.status,
         contactPerson: incident.contactPerson ?? '',
         keyNumber: incident.keyNumber ?? '',
+        assignedStaffIds: incident.assignedStaff?.map((st) => st.id) ?? [],
       })
     }
   }, [incident])
@@ -68,6 +71,7 @@ function IncidentDetail() {
       status: form.status,
       contactPerson: form.contactPerson || null,
       keyNumber: form.keyNumber || null,
+      assignedStaffIds: form.assignedStaffIds,
     })
   }
 
@@ -95,11 +99,24 @@ function IncidentDetail() {
           }} />
         </div>
 
-        <div style={{ fontSize: '0.8rem', color: '#888' }}>
-          Signalé par <strong>{incident.reportedBy.firstName} {incident.reportedBy.lastName}</strong>
-          {incident.reportedBy.telegramUsername && ` · ${incident.reportedBy.telegramUsername}`}
-          {' · '}
-          {new Date(incident.createdAt).toLocaleString('fr-CH')}
+        <div style={{ fontSize: '0.8rem', color: '#888', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span>
+            Signalé par <strong>{incident.reportedBy.firstName} {incident.reportedBy.lastName}</strong>
+            {incident.reportedBy.telegramUsername && ` · ${incident.reportedBy.telegramUsername}`}
+          </span>
+          <span>·</span>
+          <span>{new Date(incident.createdAt).toLocaleString('fr-CH')}</span>
+          {incident.assignedStaff && incident.assignedStaff.length > 0 && (
+            <>
+              <span>·</span>
+              <span style={{ color: 'var(--s4s-primary, #6366f1)', fontWeight: 500 }}>
+                Attribué à :{' '}
+                <strong>
+                  {incident.assignedStaff.map((st) => `${st.firstName} ${st.lastName}`).join(', ')}
+                </strong>
+              </span>
+            </>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -142,6 +159,15 @@ function IncidentDetail() {
               />
             </label>
           </div>
+
+          <StaffCombobox
+            multiple
+            label="Staffs attribués"
+            placeholder="Sélectionner des membres du staff..."
+            value={form.assignedStaffIds}
+            onChange={(ids) => setForm((f) => ({ ...f, assignedStaffIds: ids }))}
+            allowUnassigned={true}
+          />
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.875rem', fontWeight: 500 }}>
             Description
@@ -187,7 +213,6 @@ function IncidentDetail() {
                 onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as typeof form.status }))}
                 style={{ padding: '0.4rem 0.6rem', border: '1px solid #ddd', borderRadius: '0.4rem', fontFamily: 'inherit', fontSize: '0.9rem', background: 'white' }}
               >
-                <option value='OPEN'>Ouvert</option>
                 <option value='IN_PROGRESS'>En cours</option>
                 <option value='RESOLVED'>Résolu</option>
               </select>

@@ -11,6 +11,7 @@ export const incidentsRouter = router({
       orderBy: { createdAt: 'desc' },
       include: {
         reportedBy: { select: { firstName: true, lastName: true, telegramUsername: true } },
+        assignedStaff: { select: { id: true, firstName: true, lastName: true, role: true } },
       },
     })
   }),
@@ -24,11 +25,22 @@ export const incidentsRouter = router({
       severity: z.enum(['LOW', 'MEDIUM', 'HIGH']).default('LOW'),
       contactPerson: z.string().optional(),
       keyNumber: z.string().optional(),
+      assignedStaffIds: z.array(z.string()).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
+      const { assignedStaffIds, ...rest } = input
       const incident = await ctx.db.incident.create({
-        data: { ...input, reportedById: ctx.user.id },
-        include: { reportedBy: { select: { firstName: true, lastName: true, telegramUsername: true } } },
+        data: {
+          ...rest,
+          reportedById: ctx.user.id,
+          ...(assignedStaffIds && assignedStaffIds.length > 0 ? {
+            assignedStaff: { connect: assignedStaffIds.map((id) => ({ id })) },
+          } : {}),
+        },
+        include: {
+          reportedBy: { select: { firstName: true, lastName: true, telegramUsername: true } },
+          assignedStaff: { select: { id: true, firstName: true, lastName: true, role: true } },
+        },
       })
       incidentEmitter.emit('created', incident)
       return incident
@@ -42,6 +54,7 @@ export const incidentsRouter = router({
         include: {
           reportedBy: { select: { firstName: true, lastName: true, telegramUsername: true } },
           assignedTo: { select: { id: true, firstName: true, lastName: true } },
+          assignedStaff: { select: { id: true, firstName: true, lastName: true, role: true } },
         },
       })
     }),
@@ -54,18 +67,25 @@ export const incidentsRouter = router({
       location: z.string().optional(),
       category: z.string().optional(),
       severity: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
-      status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED']).optional(),
+      status: z.enum(['IN_PROGRESS', 'RESOLVED']).optional(),
       contactPerson: z.string().nullable().optional(),
       keyNumber: z.string().nullable().optional(),
+      assignedStaffIds: z.array(z.string()).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      const { id, ...data } = input
+      const { id, assignedStaffIds, ...data } = input
       const incident = await ctx.db.incident.update({
         where: { id },
-        data,
+        data: {
+          ...data,
+          ...(assignedStaffIds !== undefined ? {
+            assignedStaff: { set: assignedStaffIds.map((sid) => ({ id: sid })) },
+          } : {}),
+        },
         include: {
           reportedBy: { select: { firstName: true, lastName: true, telegramUsername: true } },
           assignedTo: { select: { id: true, firstName: true, lastName: true } },
+          assignedStaff: { select: { id: true, firstName: true, lastName: true, role: true } },
         },
       })
       incidentEmitter.emit('updated', incident)
@@ -80,6 +100,7 @@ export const incidentsRouter = router({
         include: {
           reportedBy: { select: { firstName: true, lastName: true, telegramUsername: true } },
           assignedTo: { select: { id: true, firstName: true, lastName: true } },
+          assignedStaff: { select: { id: true, firstName: true, lastName: true, role: true } },
         },
       })
       incidentEmitter.emit('deleted', incident)

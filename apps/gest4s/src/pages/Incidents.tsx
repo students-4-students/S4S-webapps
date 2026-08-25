@@ -3,13 +3,13 @@ import { Link } from '@tanstack/react-router'
 import { trpc } from '../trpc'
 import IncidentCard from '../components/IncidentCard'
 import CreateIncidentModal from '../components/CreateIncidentModal'
+import StaffCombobox from '../components/StaffCombobox'
 import { PageHeader, Select, Button, EmptyState, LoadingSpinner } from '@s4s/ui'
 import { useIncidentRealtimeUpdates } from '../hooks/useIncidentRealtimeUpdates'
 import '../../styles/dashboard.css'
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Tous les statuts' },
-  { value: 'OPEN', label: 'Ouvert' },
   { value: 'IN_PROGRESS', label: 'En cours' },
   { value: 'RESOLVED', label: 'Résolu' },
 ]
@@ -25,7 +25,7 @@ const CATEGORIES = ['Matériel', 'Problèmes techniques', 'Logistique', 'Caterin
 
 function Incidents() {
   const [showModal, setShowModal] = useState(false)
-  const [filters, setFilters] = useState({ status: '', severity: '', category: '' })
+  const [filters, setFilters] = useState({ status: '', severity: '', category: '', staffId: '' })
 
   const { data: incidents = [], isLoading } = trpc.incidents.list.useQuery(undefined, {
     refetchInterval: 1000,
@@ -38,10 +38,11 @@ function Incidents() {
     (inc) =>
       (!filters.status || inc.status === filters.status) &&
       (!filters.severity || inc.severity === filters.severity) &&
-      (!filters.category || inc.category === filters.category)
+      (!filters.category || inc.category === filters.category) &&
+      (!filters.staffId || inc.assignedStaff?.some((st) => st.id === filters.staffId))
   )
 
-  const hasActiveFilters = Boolean(filters.status || filters.severity || filters.category)
+  const hasActiveFilters = Boolean(filters.status || filters.severity || filters.category || filters.staffId)
 
   return (
     <div className="dashboard" style={{ position: 'relative' }}>
@@ -95,11 +96,21 @@ function Incidents() {
             </Select>
           </div>
 
+          <div style={{ width: '240px' }}>
+            <StaffCombobox
+              placeholder="Filtrer par staff..."
+              value={filters.staffId}
+              onChange={(id) => setFilters((f) => ({ ...f, staffId: id }))}
+              allowUnassigned={true}
+              style={{ marginBottom: 0 }}
+            />
+          </div>
+
           {hasActiveFilters && (
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => setFilters({ status: '', severity: '', category: '' })}
+              onClick={() => setFilters({ status: '', severity: '', category: '', staffId: '' })}
             >
               Réinitialiser
             </Button>

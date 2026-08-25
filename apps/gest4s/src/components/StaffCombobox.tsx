@@ -1,27 +1,43 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { trpc } from '../trpc'
 
-interface StaffComboboxProps {
-  label?: string
-  placeholder?: string
+interface SingleStaffComboboxProps {
+  multiple?: false
   value: string
   onChange: (staffId: string) => void
+  label?: string
+  placeholder?: string
   allowUnassigned?: boolean
   required?: boolean
   defaultCategory?: string
   style?: React.CSSProperties
 }
 
-export default function StaffCombobox({
-  label,
-  placeholder = 'Rechercher par nom, prénom ou rôle...',
-  value,
-  onChange,
-  allowUnassigned = true,
-  required = false,
-  defaultCategory,
-  style,
-}: StaffComboboxProps) {
+interface MultiStaffComboboxProps {
+  multiple: true
+  value: string[]
+  onChange: (staffIds: string[]) => void
+  label?: string
+  placeholder?: string
+  allowUnassigned?: boolean
+  required?: boolean
+  defaultCategory?: string
+  style?: React.CSSProperties
+}
+
+export type StaffComboboxProps = SingleStaffComboboxProps | MultiStaffComboboxProps
+
+export default function StaffCombobox(props: StaffComboboxProps) {
+  const {
+    label,
+    placeholder = 'Rechercher par nom, prénom ou rôle...',
+    multiple = false,
+    allowUnassigned = true,
+    required = false,
+    defaultCategory,
+    style,
+  } = props
+
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>(defaultCategory || 'all')
@@ -40,9 +56,16 @@ export default function StaffCombobox({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const selectedStaff = useMemo(() => {
-    return staffs.find((st) => st.id === value)
-  }, [staffs, value])
+  const selectedStaffIds = useMemo(() => {
+    if (multiple) {
+      return (props.value as string[]) || []
+    }
+    return (props.value as string) ? [(props.value as string)] : []
+  }, [multiple, props.value])
+
+  const selectedStaffs = useMemo(() => {
+    return staffs.filter((st) => selectedStaffIds.includes(st.id))
+  }, [staffs, selectedStaffIds])
 
   const categories = useMemo(() => {
     const set = new Set<string>()
@@ -71,9 +94,35 @@ export default function StaffCombobox({
   }, [staffs, search, selectedCategory])
 
   const handleSelect = (id: string) => {
-    onChange(id)
-    setIsOpen(false)
-    setSearch('')
+    if (multiple) {
+      const current = (props.value as string[]) || []
+      const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id]
+      ;(props.onChange as (ids: string[]) => void)(next)
+    } else {
+      ;(props.onChange as (id: string) => void)(id)
+      setIsOpen(false)
+      setSearch('')
+    }
+  }
+
+  const handleClearAll = () => {
+    if (multiple) {
+      ;(props.onChange as (ids: string[]) => void)([])
+    } else {
+      ;(props.onChange as (id: string) => void)('')
+      setIsOpen(false)
+      setSearch('')
+    }
+  }
+
+  const handleRemoveSingle = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (multiple) {
+      const current = (props.value as string[]) || []
+      ;(props.onChange as (ids: string[]) => void)(current.filter((x) => x !== id))
+    } else {
+      ;(props.onChange as (id: string) => void)('')
+    }
   }
 
   return (
@@ -102,50 +151,52 @@ export default function StaffCombobox({
           transition: 'all 150ms ease',
         }}
       >
-        {selectedStaff ? (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.3rem',
-              fontSize: '0.825rem',
-              fontWeight: 500,
-              background: 'var(--s4s-primary-light)',
-              color: 'var(--s4s-primary-dark)',
-              padding: '0.2rem 0.5rem',
-              borderRadius: 'var(--s4s-radius-sm)',
-              border: '1px solid rgba(99, 102, 241, 0.2)',
-            }}
-          >
-            <span>
-              {selectedStaff.firstName} {selectedStaff.lastName}
-            </span>
-            {selectedStaff.role && (
-              <span style={{ opacity: 0.7, fontSize: '0.72rem' }}>({selectedStaff.role})</span>
-            )}
-            {allowUnassigned && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleSelect('')
-                }}
+        {selectedStaffs.length > 0 ? (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', flex: 1 }}>
+            {selectedStaffs.map((st) => (
+              <span
+                key={st.id}
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'inherit',
-                  cursor: 'pointer',
-                  fontSize: '0.8rem',
-                  padding: 0,
-                  marginLeft: '0.2rem',
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
+                  gap: '0.3rem',
+                  fontSize: '0.825rem',
+                  fontWeight: 500,
+                  background: 'var(--s4s-primary-light)',
+                  color: 'var(--s4s-primary-dark)',
+                  padding: '0.2rem 0.5rem',
+                  borderRadius: 'var(--s4s-radius-sm)',
+                  border: '1px solid rgba(99, 102, 241, 0.2)',
                 }}
               >
-                ✕
-              </button>
-            )}
-          </span>
+                <span>
+                  {st.firstName} {st.lastName}
+                </span>
+                {st.role && (
+                  <span style={{ opacity: 0.7, fontSize: '0.72rem' }}>({st.role})</span>
+                )}
+                {allowUnassigned && (
+                  <button
+                    type="button"
+                    onClick={(e) => handleRemoveSingle(st.id, e)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'inherit',
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                      padding: 0,
+                      marginLeft: '0.2rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
         ) : (
           <span style={{ fontSize: '0.85rem', color: 'var(--s4s-text-muted)', paddingLeft: '0.25rem' }}>
             {placeholder}
@@ -219,23 +270,23 @@ export default function StaffCombobox({
           <div style={{ overflowY: 'auto', flex: 1, padding: '0.25rem 0' }}>
             {allowUnassigned && (
               <div
-                onClick={() => handleSelect('')}
+                onClick={handleClearAll}
                 style={{
                   padding: '0.4rem 0.75rem',
                   cursor: 'pointer',
                   fontSize: '0.825rem',
                   fontStyle: 'italic',
                   color: 'var(--s4s-text-muted)',
-                  background: value === '' ? 'var(--s4s-primary-light)' : 'transparent',
+                  background: selectedStaffIds.length === 0 ? 'var(--s4s-primary-light)' : 'transparent',
                 }}
                 onMouseEnter={(e) => {
-                  if (value !== '') (e.currentTarget.style.background = 'var(--s4s-bg-subtle)')
+                  if (selectedStaffIds.length !== 0) (e.currentTarget.style.background = 'var(--s4s-bg-subtle)')
                 }}
                 onMouseLeave={(e) => {
-                  if (value !== '') (e.currentTarget.style.background = 'transparent')
+                  if (selectedStaffIds.length !== 0) (e.currentTarget.style.background = 'transparent')
                 }}
               >
-                -- Non assigné --
+                -- {multiple ? 'Désélectionner tout' : 'Non assigné'} --
               </div>
             )}
 
@@ -245,7 +296,7 @@ export default function StaffCombobox({
               </div>
             ) : (
               filteredStaffs.map((st) => {
-                const isSelected = st.id === value
+                const isSelected = selectedStaffIds.includes(st.id)
                 return (
                   <div
                     key={st.id}
@@ -292,3 +343,4 @@ export default function StaffCombobox({
     </div>
   )
 }
+

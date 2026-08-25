@@ -88,6 +88,7 @@ model StaffMember {
   Class_SpeakerClasses   Class[]          @relation("SpeakerClasses")
   readWriteClasses       Class[]          @relation("ClassReadWriteStaff")
   readOnlyClasses        Class[]          @relation("ClassReadOnlyStaff")
+  assignedIncidents      Incident[]       @relation("StaffAssignedIncidents")
 }
 
 model Shift {
@@ -133,7 +134,7 @@ model Incident {
   title         String
   description   String
   severity      Severity       @default(LOW)
-  status        IncidentStatus @default(OPEN)
+  status        IncidentStatus @default(IN_PROGRESS)
   reportedById  String
   createdAt     DateTime       @default(now())
   category      String?
@@ -143,6 +144,7 @@ model Incident {
   updatedAt     DateTime       @updatedAt
   reportedBy    User           @relation("ReportedIncidents", fields: [reportedById], references: [id])
   assignedTo    User[]         @relation("AssignedIncidents")
+  assignedStaff StaffMember[]  @relation("StaffAssignedIncidents")
 }
 
 model Poll {
@@ -314,7 +316,6 @@ enum Priority {
 }
 
 enum IncidentStatus {
-  OPEN
   IN_PROGRESS
   RESOLVED
 }

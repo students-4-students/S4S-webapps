@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { trpc } from '../trpc'
 import { Modal, Input, Select, Button } from '@s4s/ui'
+import StaffCombobox from './StaffCombobox'
 
 const defaultForm = {
   title: '',
@@ -10,6 +11,7 @@ const defaultForm = {
   severity: 'LOW' as const,
   contactPerson: '',
   keyNumber: '',
+  assignedStaffIds: [] as string[],
 }
 
 interface Props {
@@ -43,6 +45,7 @@ function CreateIncidentModal({ onClose, defaultTitle = '', defaultLocation = '' 
       severity: form.severity,
       contactPerson: form.contactPerson || undefined,
       keyNumber: form.keyNumber || undefined,
+      assignedStaffIds: form.assignedStaffIds.length > 0 ? form.assignedStaffIds : undefined,
     })
   }
 
@@ -86,6 +89,15 @@ function CreateIncidentModal({ onClose, defaultTitle = '', defaultLocation = '' 
           placeholder="Ex: Clé n° 12..."
           value={form.keyNumber}
           onChange={(e) => setForm((f) => ({ ...f, keyNumber: e.target.value }))}
+        />
+
+        <StaffCombobox
+          multiple
+          label="Staffs attribués"
+          placeholder="Sélectionner des membres du staff (optionnel)..."
+          value={form.assignedStaffIds}
+          onChange={(ids) => setForm((f) => ({ ...f, assignedStaffIds: ids }))}
+          allowUnassigned={true}
         />
 
         <Select

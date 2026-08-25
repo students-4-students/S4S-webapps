@@ -18,13 +18,11 @@ const SEVERITY_LABELS: Record<string, string> = {
 }
 
 const STATUS_VARIANTS: Record<string, 'danger' | 'warning' | 'success'> = {
-  OPEN: 'danger',
   IN_PROGRESS: 'warning',
   RESOLVED: 'success',
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  OPEN: 'Ouvert',
   IN_PROGRESS: 'En cours',
   RESOLVED: 'Résolu',
 }
@@ -112,7 +110,7 @@ function IncidentCard({ incident, showDelete=true }: { incident: Incident; showD
           {incident.description}
         </p>
 
-        <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.78rem', color: 'var(--s4s-text-muted)', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.78rem', color: 'var(--s4s-text-muted)', flexWrap: 'wrap', marginTop: '0.25rem', alignItems: 'center' }}>
           <span style={{ color: SEVERITY_COLOR[incident.severity], fontWeight: 600 }}>
             {SEVERITY_LABELS[incident.severity]}
           </span>
@@ -120,6 +118,25 @@ function IncidentCard({ incident, showDelete=true }: { incident: Incident; showD
           {incident.category && <span>· {incident.category}</span>}
           {incident.contactPerson && <span>· 👤 {incident.contactPerson}</span>}
           {incident.keyNumber && <span>· 🔑 Clé n°{incident.keyNumber}</span>}
+          {incident.assignedStaff && incident.assignedStaff.length > 0 && (
+            <span style={{ display: 'inline-flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+              {incident.assignedStaff.map((st) => (
+                <span
+                  key={st.id}
+                  style={{
+                    color: 'var(--s4s-primary, #6366f1)',
+                    fontWeight: 600,
+                    background: 'var(--s4s-primary-light, rgba(99, 102, 241, 0.1))',
+                    padding: '0.1rem 0.4rem',
+                    borderRadius: '4px',
+                    fontSize: '0.75rem',
+                  }}
+                >
+                  👤 {st.firstName} {st.lastName}
+                </span>
+              ))}
+            </span>
+          )}
           <span style={{ marginLeft: 'auto' }}>
             {incident.reportedBy.firstName} {incident.reportedBy.lastName}
           </span>

@@ -14,7 +14,7 @@ function IncidentList({ onNew }: Props) {
 
   useIncidentRealtimeUpdates()
 
-  const visibleIncidents = incidents.filter((incident) => incident.status === 'OPEN' || incident.status === 'IN_PROGRESS')
+  const visibleIncidents = incidents.filter((incident) => incident.status === 'IN_PROGRESS')
 
   return (
     <div
