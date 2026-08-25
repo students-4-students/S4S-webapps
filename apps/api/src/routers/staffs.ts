@@ -48,7 +48,7 @@ export const staffsRouter = router({
       z.object({
         firstName: z.string().min(1),
         lastName: z.string().min(1),
-        role: z.string().min(1),
+        role: z.string().default(''),
         status: z.enum(['ACTIVE', 'INACTIVE', 'ON_LEAVE']).default('ACTIVE'),
         isPresent: z.boolean().default(false),
         email: z.string().email().optional().nullable(),
@@ -61,7 +61,7 @@ export const staffsRouter = router({
         data: {
           firstName: input.firstName,
           lastName: input.lastName,
-          role: input.role,
+          role: input.role || '',
           status: input.status,
           isPresent: input.isPresent,
           email: input.email || null,
@@ -80,7 +80,7 @@ export const staffsRouter = router({
         z.object({
           firstName: z.string().min(1),
           lastName: z.string().min(1),
-          role: z.string().min(1),
+          role: z.string().default(''),
           status: z.enum(['ACTIVE', 'INACTIVE', 'ON_LEAVE']).default('ACTIVE'),
           isPresent: z.boolean().default(false),
           email: z.string().email().or(z.string().length(0)).optional().nullable(),
@@ -167,7 +167,7 @@ export const staffsRouter = router({
         id: z.string(),
         firstName: z.string().min(1).optional(),
         lastName: z.string().min(1).optional(),
-        role: z.string().min(1).optional(),
+        role: z.string().optional(),
         status: z.enum(['ACTIVE', 'INACTIVE', 'ON_LEAVE']).optional(),
         isPresent: z.boolean().optional(),
         email: z.string().email().or(z.string().length(0)).optional().nullable(),

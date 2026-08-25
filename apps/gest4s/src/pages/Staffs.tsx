@@ -16,10 +16,10 @@ const ROLES = [
   'Speaker',
   'Assistant',
   'RC',
-  'Staffs Logistique',
-  'Staffs Catering',
-  'Staffs Animation',
-  'Staffs Comm',
+  'Staff Logistique',
+  'Staff Catering',
+  'Staff Animation',
+  'Staff Comm',
   'Comité',
 ]
 
@@ -104,10 +104,6 @@ function Staffs() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (selectedRoles.length === 0) {
-      alert('Veuillez sélectionner au moins un rôle.')
-      return
-    }
     try {
       const newStaff = await createMutation.mutateAsync({
         firstName,
@@ -310,7 +306,7 @@ function Staffs() {
         const formatted = rawParsed.map((item) => ({
           firstName: item.firstName,
           lastName: item.lastName,
-          role: item.role || 'Staffs Logistique',
+          role: item.role || '',
           status: 'ACTIVE' as const,
           isPresent: false,
           email: item.email,
@@ -342,9 +338,9 @@ function Staffs() {
   }
 
   const getLinkedCoursesLabel = (staff: any) => {
-    const isSpeaker = staff.role.toLowerCase().includes('speaker')
-    const isAssistant = staff.role.toLowerCase().includes('assistant')
-    const isRc = staff.role.toLowerCase().includes('rc')
+    const isSpeaker = (staff.role || '').toLowerCase().includes('speaker')
+    const isAssistant = (staff.role || '').toLowerCase().includes('assistant')
+    const isRc = (staff.role || '').toLowerCase().includes('rc')
     const coursesList: string[] = []
 
     if (isSpeaker) {
@@ -449,7 +445,7 @@ function Staffs() {
                   <tr key={staff.id} className={getRowClass(staff.isPresent, staff.status)}>
                     <td>{staff.firstName}</td>
                     <td>{staff.lastName}</td>
-                    <td>{staff.role}</td>
+                    <td>{staff.role || '-'}</td>
                     <td style={{ fontSize: '0.8rem' }}>{getLinkedCoursesLabel(staff)}</td>
                     <td>
                       <select

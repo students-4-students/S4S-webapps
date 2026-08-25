@@ -51,10 +51,10 @@ const extractClassNames = (cellValue?: string | null): string[] => {
 }
 
 const BOOLEAN_ROLE_COLUMNS: Array<{ label: string; aliases: string[] }> = [
-  { label: 'Staffs Catering', aliases: ['staffs catering', 'staff catering', 'catering', 'nourriture', 'bouffe', 'cat'] },
-  { label: 'Staffs Logistique', aliases: ['staffs logistique', 'staff logistique', 'equipier logistique', 'logistique', 'log'] },
-  { label: 'Staffs Animation', aliases: ['staffs animation', 'staff animation', 'animation', 'anim'] },
-  { label: 'Staffs Comm', aliases: ['staffs comm', 'staff comm', 'staffs communication', 'staff communication', 'communication', 'comm', 'com'] },
+  { label: 'Staff Catering', aliases: ['staff catering', 'staffs catering', 'catering', 'nourriture', 'bouffe', 'cat'] },
+  { label: 'Staff Logistique', aliases: ['staff logistique', 'staffs logistique', 'equipier logistique', 'logistique', 'log'] },
+  { label: 'Staff Animation', aliases: ['staff animation', 'staffs animation', 'animation', 'anim'] },
+  { label: 'Staff Comm', aliases: ['staff comm', 'staffs comm', 'staff communication', 'staffs communication', 'communication', 'comm', 'com'] },
   { label: 'Comité', aliases: ['comite', 'committee', 'org', 'orga'] },
 ]
 
