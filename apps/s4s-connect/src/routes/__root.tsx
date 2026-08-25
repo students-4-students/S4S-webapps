@@ -32,6 +32,12 @@ function RootLayout() {
             <img className="brand-logo" src="/s4s-logo.svg" alt="S4S Connect Logo" />
             <span className="brand-name">S4S Connect</span>
           </div>
+
+          <div className="header-brand">
+            <a href="tel:+41216938561" className="dispatch-link">
+              <span className="dispatch-number">+41 21 69 38 5 61</span>
+            </a>
+          </div>
           
           <div className="user-profile">
             <div className="user-info" onClick={() => setMenuOpen(!menuOpen)}>

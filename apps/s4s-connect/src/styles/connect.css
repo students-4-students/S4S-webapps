@@ -148,6 +148,25 @@ body {
   color: white;
 }
 
+.dispatch-number {
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: -0.5px;
+  color: white;
+}
+
+@media (max-width: 767px) {
+  .brand-name {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .user-name {
+    display: none;
+  }
+}
+
 .user-profile {
   position: relative;
 }
