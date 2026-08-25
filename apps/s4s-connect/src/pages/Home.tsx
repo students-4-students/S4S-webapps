@@ -130,7 +130,7 @@ export default function Home() {
                 <div className="welcome-details-grid">
                   <div className="detail-entry">
                     <span className="label">📅 Date & Heure :</span>
-                    <span className="value">26/08/2026 à 08:00</span>
+                    <span className="value">26/08/2026 à 08:45</span>
                   </div>
                   <div className="detail-entry">
                     <span className="label">👥 Groupe d'accueil :</span>
@@ -256,16 +256,6 @@ export default function Home() {
               ))}
             </div>
           )}
-        </div>
-
-        {/* SHORTCUTS / ACCÈS RAPIDES */}
-        <div className="section-block">
-          <h3>🔗 Liens rapides</h3>
-          <div className="shortcuts-row">
-            <Link to="/map" className="shortcut-btn">🗺️ Plan Interactif</Link>
-            <Link to={"/feedback" as any} className="shortcut-btn">💬 Laisser un Avis</Link>
-            <a href="https://epfl.ch" target="_blank" rel="noopener noreferrer" className="shortcut-btn">🏫 Site EPFL</a>
-          </div>
         </div>
       </div>
     </div>
