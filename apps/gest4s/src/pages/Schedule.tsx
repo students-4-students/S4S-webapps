@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Link } from '@tanstack/react-router'
 import { trpc } from '../trpc'
+import { Modal, Button, Badge } from '@s4s/ui'
 import CreateClassModal from '../components/CreateClassModal'
 import EditClassModal from '../components/EditClassModal'
 import CreateShiftModal from '../components/CreateShiftModal'
@@ -56,12 +57,15 @@ function Schedule() {
   const [showExportMenu, setShowExportMenu] = useState<boolean>(false)
   const [selectedSlotForEdit, setSelectedSlotForEdit] = useState<any | null>(null)
   const [selectedShiftForEdit, setSelectedShiftForEdit] = useState<any | null>(null)
+  const [selectedWorkshopForView, setSelectedWorkshopForView] = useState<any | null>(null)
   const [duplicateInitialData, setDuplicateInitialData] = useState<any | null>(null)
 
   const { data: slots, isLoading: loadingSlots, error: errorSlots } = trpc.schedules.list.useQuery()
   const { data: staffs, isLoading: loadingStaffs } = trpc.staffs.list.useQuery()
   const { data: tasks = [] } = trpc.tasks.list.useQuery()
   const { data: shifts = [] } = trpc.shifts.list.useQuery()
+  const { data: workshops = [] } = trpc.workshops.list.useQuery()
+  const { data: rooms = [] } = trpc.rooms.list.useQuery()
 
   // Map operational tasks assigned to staff members so they show up on their schedule
   const mappedTaskSlots = useMemo(() => {
@@ -79,6 +83,8 @@ function Schedule() {
             startTime: task.startTime,
             endTime: task.endTime,
             location: task.location,
+            roomId: task.roomId || null,
+            room: task.room || null,
             type: 'SPECIAL' as const,
             isOperationalTask: true,
             category: task.category,
@@ -115,6 +121,44 @@ function Schedule() {
       rawShift: shift,
     }))
   }, [shifts])
+
+  // Map workshop sessions so they appear on room schedules and general planning
+  const mappedWorkshopSlots = useMemo(() => {
+    if (!workshops || workshops.length === 0) return []
+    const mapped: any[] = []
+
+    workshops.forEach((workshop: any) => {
+      (workshop.dates || []).forEach((session: any) => {
+        const loc = session.location || session.room?.name || workshop.room?.name || workshop.location || ''
+        const roomId = session.roomId || workshop.roomId || null
+        const roomObj = session.room || workshop.room || null
+
+        const isConf = (workshop.category || 'Workshop') === 'Conférences'
+        mapped.push({
+          id: `workshop-${workshop.id}-${session.id}`,
+          workshopId: workshop.id,
+          sessionId: session.id,
+          title: `[${isConf ? 'Conférence' : 'Workshop'}] ${workshop.title}`,
+          description: workshop.description || (isConf ? 'Conférence' : 'Atelier / Workshop'),
+          startTime: session.startTime,
+          endTime: session.endTime,
+          location: loc,
+          roomId: roomId,
+          room: roomObj,
+          type: 'WORKSHOP' as const,
+          isWorkshop: true,
+          category: workshop.category || 'Workshop',
+          speakerId: null,
+          assistantId: null,
+          rcId: null,
+          section: null,
+          rawWorkshop: workshop,
+          rawSession: session,
+        })
+      })
+    })
+    return mapped
+  }, [workshops])
 
   const formatTime = (date: Date | string) => {
     const d = typeof date === 'string' ? new Date(date) : date
@@ -263,12 +307,44 @@ function Schedule() {
     }))
   } else if (viewType === 'location') {
     const uniqueLocationsSet = new Set<string>()
-    safeSlots.forEach((slot) => {
-      if (slot.location) {
-        const rooms = slot.location.split(/[,;/]+/).map((r) => r.trim()).filter((r) => r.length > 0)
-        rooms.forEach((room) => uniqueLocationsSet.add(room))
+
+    // 1. Rooms from DB
+    rooms.forEach((r: any) => {
+      if (r.name && r.name.trim()) {
+        uniqueLocationsSet.add(r.name.trim())
       }
     })
+
+    // 2. Locations from safeSlots (classes)
+    safeSlots.forEach((slot) => {
+      if (slot.location) {
+        const rList = slot.location.split(/[,;/]+/).map((r) => r.trim()).filter((r) => r.length > 0)
+        rList.forEach((room) => uniqueLocationsSet.add(room))
+      }
+      if (slot.room?.name) {
+        uniqueLocationsSet.add(slot.room.name.trim())
+      }
+    })
+
+    // 3. Locations from workshops
+    mappedWorkshopSlots.forEach((wSlot) => {
+      if (wSlot.location) {
+        const rList = wSlot.location.split(/[,;/]+/).map((r: string) => r.trim()).filter((r: string) => r.length > 0)
+        rList.forEach((room: string) => uniqueLocationsSet.add(room))
+      }
+      if (wSlot.room?.name) {
+        uniqueLocationsSet.add(wSlot.room.name.trim())
+      }
+    })
+
+    // 4. Locations from tasks
+    mappedTaskSlots.forEach((tSlot) => {
+      if (tSlot.location) {
+        const rList = tSlot.location.split(/[,;/]+/).map((r: string) => r.trim()).filter((r: string) => r.length > 0)
+        rList.forEach((room: string) => uniqueLocationsSet.add(room))
+      }
+    })
+
     const uniqueLocations = Array.from(uniqueLocationsSet)
     dropdownEntities = uniqueLocations.map((loc) => ({
       id: loc,
@@ -276,7 +352,7 @@ function Schedule() {
     }))
     dropdownEntities.sort((a, b) => a.label.localeCompare(b.label))
 
-    if (safeSlots.some((s) => !s.location)) {
+    if (safeSlots.some((s) => !s.location) || mappedWorkshopSlots.some((w) => !w.location)) {
       dropdownEntities.push({ id: 'none', label: 'Sans salle' })
     }
   }
@@ -338,7 +414,7 @@ function Schedule() {
 
   // Filter slots for a given day and selected entity
   const getSlotsForDay = (dateStr: string) => {
-    const combinedSlots = [...safeSlots, ...mappedTaskSlots, ...mappedShiftSlots]
+    const combinedSlots = [...safeSlots, ...mappedTaskSlots, ...mappedShiftSlots, ...mappedWorkshopSlots]
     const filtered = combinedSlots.filter((slot) => {
       if (getSlotDateStr(slot.startTime) !== dateStr) return false
 
@@ -353,11 +429,34 @@ function Schedule() {
         return slotSectionNames.includes(activeEntityId.toUpperCase())
       } else if (viewType === 'location') {
         if (activeEntityId === 'none') {
-          return !slot.location
+          return !slot.location && !slot.room && !slot.roomId
         }
-        if (!slot.location) return false
-        const rooms = slot.location.split(/[,;/]+/).map((r: string) => r.trim().toUpperCase()).filter((r: string) => r.length > 0)
-        return rooms.includes(activeEntityId.toUpperCase())
+        const activeUpper = activeEntityId.trim().toUpperCase()
+
+        // Match by room object name
+        if (slot.room?.name && slot.room.name.trim().toUpperCase() === activeUpper) {
+          return true
+        }
+
+        // Match by roomId if activeEntity matches any room with that id
+        if (slot.roomId) {
+          const matchedDbRoom = rooms.find((r: any) => r.id === slot.roomId)
+          if (matchedDbRoom && matchedDbRoom.name.trim().toUpperCase() === activeUpper) {
+            return true
+          }
+        }
+
+        // Match by location string tokens
+        if (slot.location) {
+          const slotRooms = slot.location.split(/[,;/]+/).map((r: string) => r.trim().toUpperCase()).filter((r: string) => r.length > 0)
+          if (slotRooms.includes(activeUpper)) {
+            return true
+          }
+          if (slotRooms.some((r: string) => r === activeUpper || r.includes(activeUpper) || activeUpper.includes(r))) {
+            return true
+          }
+        }
+        return false
       } else if (viewType === 'person') {
         if (activeEntityId === 'none') {
           return !slot.speakerId && !slot.assistantId && !slot.rcId && !slot.assignedStaffId
@@ -782,6 +881,8 @@ function Schedule() {
                         onClick={() => {
                           if (slot.isShift) {
                             setSelectedShiftForEdit(slot)
+                          } else if (slot.isWorkshop) {
+                            setSelectedWorkshopForView(slot)
                           } else if (!slot.isOperationalTask) {
                             setSelectedSlotForEdit(slot)
                           }
@@ -833,6 +934,58 @@ function Schedule() {
           onClose={() => setSelectedShiftForEdit(null)}
         />
       )}
+      {selectedWorkshopForView && (
+        <Modal
+          isOpen={Boolean(selectedWorkshopForView)}
+          onClose={() => setSelectedWorkshopForView(null)}
+          title={selectedWorkshopForView.title}
+          size="md"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', color: 'var(--s4s-text-primary)' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <Badge variant="neutral">
+                {(selectedWorkshopForView.rawWorkshop?.category || 'Workshop') === 'Conférences' ? '🎤 Conférence' : '🛠️ Workshop'}
+              </Badge>
+              {selectedWorkshopForView.rawWorkshop?.requiresRegistration ? (
+                <Badge variant="warning">
+                  📝 Inscription requise ({selectedWorkshopForView.rawSession?.registrations?.length || 0}
+                  {selectedWorkshopForView.rawWorkshop?.maxParticipants
+                    ? ` / ${selectedWorkshopForView.rawWorkshop.maxParticipants}`
+                    : ''}
+                  )
+                </Badge>
+              ) : (
+                <Badge variant="success">Accès libre</Badge>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.9rem' }}>
+              <div>
+                <strong>🕒 Horaire :</strong> {formatTime(selectedWorkshopForView.startTime)} -{' '}
+                {formatTime(selectedWorkshopForView.endTime)}
+              </div>
+              <div>
+                <strong>📍 Lieu / Salle :</strong> {selectedWorkshopForView.location || 'Non précisé'}
+              </div>
+            </div>
+
+            {selectedWorkshopForView.description && (
+              <div style={{ background: 'var(--s4s-bg-subtle)', padding: '0.85rem', borderRadius: 'var(--s4s-radius-md)', fontSize: '0.88rem', lineHeight: '1.5' }}>
+                {selectedWorkshopForView.description}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <Link to="/workshops" className="s4s-button s4s-button--secondary s4s-button--sm">
+                Gérer les ateliers
+              </Link>
+              <Button variant="primary" size="sm" onClick={() => setSelectedWorkshopForView(null)}>
+                Fermer
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
@@ -849,6 +1002,7 @@ function AbsoluteSlotCard({ slot, style, formatTime, onClick }: AbsoluteSlotCard
 
   const isOpTask = slot.isOperationalTask
   const isShift = slot.isShift
+  const isWorkshop = slot.isWorkshop
 
   const shiftColors: Record<string, string> = {
     Logistique: '#ec4899',
@@ -887,6 +1041,11 @@ function AbsoluteSlotCard({ slot, style, formatTime, onClick }: AbsoluteSlotCard
       color: 'white',
       cursor: 'pointer',
     }
+  } else if (isWorkshop) {
+    customStyle = {
+      ...style,
+      cursor: 'pointer',
+    }
   }
 
   return (
@@ -906,6 +1065,11 @@ function AbsoluteSlotCard({ slot, style, formatTime, onClick }: AbsoluteSlotCard
         {isShift && (
           <span style={{ fontSize: '0.62rem', background: 'rgba(168, 85, 247, 0.3)', padding: '0.05rem 0.3rem', borderRadius: '3px', marginLeft: 'auto' }}>
             🗓️ Shift ({slot.shiftType})
+          </span>
+        )}
+        {isWorkshop && (
+          <span style={{ fontSize: '0.62rem', background: 'rgba(219, 39, 119, 0.2)', padding: '0.05rem 0.3rem', borderRadius: '3px', marginLeft: 'auto', color: '#be185d', fontWeight: 600 }}>
+            🛠️ Workshop
           </span>
         )}
       </div>

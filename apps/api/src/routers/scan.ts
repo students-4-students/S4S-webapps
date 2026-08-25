@@ -56,19 +56,12 @@ export const scanRouter = router({
         }
       }
 
-      if (student.firstDayGroup && student.firstDayGroup !== input.entrance) {
-        return {
-          status: 'WRONG_ENTRANCE' as const,
-          student,
-          expectedEntrance: student.firstDayGroup as 'A' | 'B',
-        }
-      }
-
       // Record the scan
       const updated = await ctx.db.user.update({
         where: { id: student.id },
         data: {
           QRScannedAt: new Date(),
+          firstDayGroup: input.entrance,
         },
         include: { section: true },
       })
@@ -93,13 +86,14 @@ export const scanRouter = router({
 
   /** Global scan statistics. */
   stats: publicProcedure.query(async ({ ctx }) => {
-    const [total, scannedA, scannedB, scannedNoGroup] = await Promise.all([
+    const [total, scanned, scannedA, scannedB, totalA, totalB] = await Promise.all([
       ctx.db.user.count({ where: { role: 'PARTICIPANT' } }),
+      ctx.db.user.count({ where: { role: 'PARTICIPANT', QRScannedAt: { not: null } } }),
       ctx.db.user.count({ where: { role: 'PARTICIPANT', QRScannedAt: { not: null }, firstDayGroup: 'A' } }),
       ctx.db.user.count({ where: { role: 'PARTICIPANT', QRScannedAt: { not: null }, firstDayGroup: 'B' } }),
-      ctx.db.user.count({ where: { role: 'PARTICIPANT', QRScannedAt: { not: null }, firstDayGroup: null } }),
+      ctx.db.user.count({ where: { role: 'PARTICIPANT', firstDayGroup: 'A' } }),
+      ctx.db.user.count({ where: { role: 'PARTICIPANT', firstDayGroup: 'B' } }),
     ])
-    const scanned = scannedA + scannedB + scannedNoGroup
-    return { total, scanned, scannedA, scannedB, pending: total - scanned }
+    return { total, scanned, scannedA, scannedB, totalA, totalB, pending: total - scanned }
   }),
 })

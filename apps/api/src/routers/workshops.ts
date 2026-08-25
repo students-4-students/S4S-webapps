@@ -43,6 +43,7 @@ export const workshopsRouter = router({
       roomId: z.string().nullable().optional(),
       description: z.string().min(1),
       image: z.string().optional(),
+      category: z.string().nullable().optional(),
       requiresRegistration: z.boolean().default(false),
       onlyOneSlotPerUser: z.boolean().default(false),
       isRegistrationClosed: z.boolean().default(false),
@@ -60,6 +61,7 @@ export const workshopsRouter = router({
       const workshop = await ctx.db.workshop.create({
         data: {
           ...data,
+          category: data.category || 'Workshop',
           roomId: roomId || null,
           dates: {
             create: dates.map(d => ({
@@ -92,6 +94,7 @@ export const workshopsRouter = router({
       roomId: z.string().nullable().optional(),
       description: z.string().min(1).optional(),
       image: z.string().optional(),
+      category: z.string().nullable().optional(),
       requiresRegistration: z.boolean().optional(),
       onlyOneSlotPerUser: z.boolean().optional(),
       isRegistrationClosed: z.boolean().optional(),

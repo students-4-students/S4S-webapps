@@ -39,6 +39,7 @@ interface Workshop {
   } | null
   description: string
   image: string | null
+  category?: string | null
   requiresRegistration: boolean
   onlyOneSlotPerUser?: boolean
   isRegistrationClosed?: boolean
@@ -51,6 +52,7 @@ import { formatDateTimeRange } from '@s4s/ui'
 
 export default function Workshops() {
   const [searchQuery, setSearchQuery] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'Workshop' | 'Conférences'>('all')
   const [registrationFilter, setRegistrationFilter] = useState<'all' | 'required' | 'open' | 'favorites'>('all')
   const [timeFilter, setTimeFilter] = useState<'all' | 'upcoming' | 'past'>('all')
   const [toastMessage, setToastMessage] = useState<string | null>(null)
@@ -236,8 +238,13 @@ export default function Workshops() {
         !searchQuery ||
         w.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         w.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (w.room?.name && w.room.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
         w.description.toLowerCase().includes(searchQuery.toLowerCase())
       
+      const matchesCategory =
+        categoryFilter === 'all' ||
+        (w.category || 'Workshop') === categoryFilter
+
       let matchesReg = true
       if (registrationFilter === 'required') {
         matchesReg = w.requiresRegistration
@@ -252,12 +259,12 @@ export default function Workshops() {
         const hasUpcoming = w.dates.some((d) => new Date(d.endTime).getTime() > now)
         matchesTime = timeFilter === 'upcoming' ? hasUpcoming : !hasUpcoming
       }
-      return matchesSearch && matchesReg && matchesTime
+      return matchesSearch && matchesCategory && matchesReg && matchesTime
     })
-  }, [workshops, searchQuery, registrationFilter, timeFilter, favoriteIds])
+  }, [workshops, searchQuery, categoryFilter, registrationFilter, timeFilter, favoriteIds])
 
-  const hasActiveFilters = searchQuery !== '' || registrationFilter !== 'all' || timeFilter !== 'all'
-  const resetFilters = () => { setSearchQuery(''); setRegistrationFilter('all'); setTimeFilter('all') }
+  const hasActiveFilters = searchQuery !== '' || categoryFilter !== 'all' || registrationFilter !== 'all' || timeFilter !== 'all'
+  const resetFilters = () => { setSearchQuery(''); setCategoryFilter('all'); setRegistrationFilter('all'); setTimeFilter('all') }
 
   // Split: today vs rest
   const { todayWorkshops, otherWorkshops } = useMemo(() => {
@@ -363,10 +370,13 @@ export default function Workshops() {
           )}
         </div>
         <div className="filters-row">
-          <button className={`filter-chip ${registrationFilter === 'all' ? 'active' : ''}`} onClick={() => setRegistrationFilter('all')}>Tous</button>
-          <button className={`filter-chip ${registrationFilter === 'open' ? 'active' : ''}`} onClick={() => setRegistrationFilter('open')}>Entrée libre</button>
-          <button className={`filter-chip ${registrationFilter === 'required' ? 'active' : ''}`} onClick={() => setRegistrationFilter('required')}>Inscription</button>
-          <button className={`filter-chip ${registrationFilter === 'favorites' ? 'active font-rose' : ''}`} onClick={() => setRegistrationFilter('favorites')}>❤️ Favoris</button>
+          <button className={`filter-chip ${categoryFilter === 'all' ? 'active' : ''}`} onClick={() => setCategoryFilter('all')}>Tous</button>
+          <button className={`filter-chip ${categoryFilter === 'Workshop' ? 'active' : ''}`} onClick={() => setCategoryFilter('Workshop')}>🛠️ Workshops</button>
+          <button className={`filter-chip ${categoryFilter === 'Conférences' ? 'active' : ''}`} onClick={() => setCategoryFilter('Conférences')}>🎤 Conférences</button>
+          <span style={{ width: '1px', height: '1.2rem', background: 'rgba(255, 255, 255, 0.15)', margin: '0 0.2rem', alignSelf: 'center' }} />
+          <button className={`filter-chip ${registrationFilter === 'open' ? 'active' : ''}`} onClick={() => setRegistrationFilter(registrationFilter === 'open' ? 'all' : 'open')}>Entrée libre</button>
+          <button className={`filter-chip ${registrationFilter === 'required' ? 'active' : ''}`} onClick={() => setRegistrationFilter(registrationFilter === 'required' ? 'all' : 'required')}>Inscription</button>
+          <button className={`filter-chip ${registrationFilter === 'favorites' ? 'active font-rose' : ''}`} onClick={() => setRegistrationFilter(registrationFilter === 'favorites' ? 'all' : 'favorites')}>❤️ Favoris</button>
           <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value as any)} className="filter-select-connect" style={{ flex: 'none', minWidth: '0', width: 'auto' }}>
             <option value="all">Toutes les sessions</option>
             <option value="upcoming">À venir</option>
@@ -477,15 +487,28 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
     return (w.dates || []).some((d) => registeredSlotIds.includes(d.id))
   }, [w.dates, registeredSlotIds])
 
-  return (
+    const isConference = (w.category || 'Workshop') === 'Conférences'
+
+    return (
     <div className="workshop-connect-card" onClick={onClick} style={{ cursor: 'pointer' }}>
       <div className="workshop-card-image-wrap">
         {w.image ? (
           <img src={w.image} alt={w.title} className="workshop-card-img" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
         ) : (
-          <div className="workshop-card-placeholder"><span>🎨</span></div>
+          <div className="workshop-card-placeholder"><span>{isConference ? '🎤' : '🎨'}</span></div>
         )}
         <div className="workshop-badge-container">
+          <span
+            className="badge-reg"
+            style={{
+              background: isConference ? 'rgba(59, 130, 246, 0.25)' : 'rgba(236, 72, 153, 0.25)',
+              color: isConference ? '#93c5fd' : '#f472b6',
+              borderColor: isConference ? 'rgba(59, 130, 246, 0.5)' : 'rgba(236, 72, 153, 0.5)',
+              fontWeight: 700,
+            }}
+          >
+            {isConference ? '🎤 Conférence' : '🛠️ Workshop'}
+          </span>
           {w.isRegistrationClosed ? (
             <span className="badge-reg required" style={{ background: 'rgba(239, 68, 68, 0.25)', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.5)' }}>
               🔒 Inscriptions closes
@@ -504,25 +527,27 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
               1 créneau max
             </span>
           )}
-          {/* Favorite button absolute over image */}
-          <button className={`workshop-fav-btn ${isFavorite ? 'active' : ''}`} onClick={onFavoriteToggle} aria-label="Ajouter aux favoris">
-            {isFavorite ? '❤️' : '🤍'}
-          </button>
         </div>
+        {/* Favorite button placed independently on top-right */}
+        <button className={`workshop-fav-btn ${isFavorite ? 'active' : ''}`} onClick={onFavoriteToggle} aria-label="Ajouter aux favoris">
+          {isFavorite ? '❤️' : '🤍'}
+        </button>
       </div>
 
       <div className="workshop-card-body">
         <h3 className="workshop-card-title">{w.title}</h3>
         <Link
           to="/map"
-          search={{ places: w.location } as any}
+          search={{ places: w.room?.name || w.location } as any}
           className="workshop-card-location location-link"
-          style={{ textDecoration: 'none', color: 'inherit', cursor: 'pointer' }}
           title="Voir sur le plan"
           onClick={(e) => e.stopPropagation()}
         >
-          <span>📍</span>
-          <span>{w.location}</span>
+          <span className="location-icon">📍</span>
+          <span className="location-name">
+            {w.room?.name || w.location}
+            {w.room?.building && <span className="location-building"> ({w.room.building})</span>}
+          </span>
         </Link>
         <p className="workshop-card-desc">{w.description}</p>
 
@@ -541,14 +566,22 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
                 const isBlockedByOtherSlot = !isReg && Boolean(w.onlyOneSlotPerUser) && hasWorkshopReg
 
                 const isDisabled = isPast || (isClosed && !isReg) || isBlockedByOtherSlot || (spots !== null && spots.available === 0 && !isReg)
+                const sessionRoomName = d.room?.name || d.location || w.room?.name || w.location
 
                 return (
                   <div key={d.id} className={`slot-option-card ${isReg ? 'registered' : ''} ${isPast ? 'past' : ''}`} onClick={(e) => e.stopPropagation()}>
                     <div className="slot-info">
                       <div className="slot-time">
                         <span className="slot-num">#{idx + 1}</span>
-                        {formatDateTimeRange(d.startTime, d.endTime)}
+                        <span>{formatDateTimeRange(d.startTime, d.endTime)}</span>
                       </div>
+                      {sessionRoomName && (
+                        <div className="slot-location-row">
+                          <span className="slot-room-tag" title={`Salle: ${sessionRoomName}`}>
+                            📍 <strong>{sessionRoomName}</strong>
+                          </span>
+                        </div>
+                      )}
                       <div className="slot-spots-badge">
                         {isPast ? (
                           <span className="spots-tag past">Terminé</span>
@@ -567,47 +600,49 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
                         )}
                       </div>
                     </div>
-                    {w.externalRegistrationUrl ? (
-                      <a
-                        href={w.externalRegistrationUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn-slot-register external-link-btn"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <span>Formulaire ↗</span>
-                      </a>
-                    ) : (
-                      <button
-                        className={`btn-slot-register ${isReg ? 'registered' : ''}`}
-                        disabled={isDisabled}
-                        title={
-                          isPast
-                            ? 'Créneau terminé'
-                            : isClosed && !isReg
-                            ? 'Inscriptions closes'
-                            : isBlockedByOtherSlot
-                            ? 'Vous êtes déjà inscrit(e) à un autre créneau'
-                            : spots !== null && spots.available === 0 && !isReg
-                            ? 'Complet'
-                            : undefined
-                        }
-                        onClick={(e) => { e.stopPropagation(); onRegisterToggle(w, d) }}
-                      >
-                        {isPast ? (
-                          <span>Terminé</span>
-                        ) : isReg ? (
-                          <><span className="reg-icon">✓</span><span className="reg-status-label">Inscrit(e)</span><span className="reg-hover-label">Désinscrire</span></>
-                        ) : isClosed ? (
-                          <span>Clos</span>
-                        ) : isBlockedByOtherSlot ? (
-                          <span>Déjà inscrit</span>
-                        ) : spots !== null && spots.available === 0 ? (
-                          <span>Complet</span>
-                        ) : (
-                          <><span className="reg-icon">+</span><span>S'inscrire</span></>
-                        )}
-                      </button>
+                    {w.requiresRegistration && (
+                      w.externalRegistrationUrl ? (
+                        <a
+                          href={w.externalRegistrationUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn-slot-register external-link-btn"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <span>Formulaire ↗</span>
+                        </a>
+                      ) : (
+                        <button
+                          className={`btn-slot-register ${isReg ? 'registered' : ''}`}
+                          disabled={isDisabled}
+                          title={
+                            isPast
+                              ? 'Créneau terminé'
+                              : isClosed && !isReg
+                              ? 'Inscriptions closes'
+                              : isBlockedByOtherSlot
+                              ? 'Vous êtes déjà inscrit(e) à un autre créneau'
+                              : spots !== null && spots.available === 0 && !isReg
+                              ? 'Complet'
+                              : undefined
+                          }
+                          onClick={(e) => { e.stopPropagation(); onRegisterToggle(w, d) }}
+                        >
+                          {isPast ? (
+                            <span>Terminé</span>
+                          ) : isReg ? (
+                            <><span className="reg-icon">✓</span><span className="reg-status-label">Inscrit(e)</span><span className="reg-hover-label">Désinscrire</span></>
+                          ) : isClosed ? (
+                            <span>Clos</span>
+                          ) : isBlockedByOtherSlot ? (
+                            <span>Déjà inscrit</span>
+                          ) : spots !== null && spots.available === 0 ? (
+                            <span>Complet</span>
+                          ) : (
+                            <><span className="reg-icon">+</span><span>S'inscrire</span></>
+                          )}
+                        </button>
+                      )
                     )}
                   </div>
                 )
@@ -652,7 +687,9 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
     return (w.dates || []).some((d) => registeredSlotIds.includes(d.id))
   }, [w.dates, registeredSlotIds])
 
-  return (
+    const isConference = (w.category || 'Workshop') === 'Conférences'
+
+    return (
     <div className="workshop-detail-overlay" onClick={onClose}>
       <div className="workshop-detail-panel" onClick={(e) => e.stopPropagation()}>
         {/* Image header */}
@@ -660,7 +697,7 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
           {w.image ? (
             <img src={w.image} alt={w.title} className="detail-img" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
           ) : (
-            <div className="detail-img-placeholder"><span>🎨</span></div>
+            <div className="detail-img-placeholder"><span>{isConference ? '🎤' : '🎨'}</span></div>
           )}
           <div className="detail-image-gradient" />
           <button className="detail-close-btn" onClick={onClose} aria-label="Fermer">
@@ -675,6 +712,17 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
           </button>
 
           <div className="detail-header-content">
+            <span
+              className="badge-reg"
+              style={{
+                background: isConference ? 'rgba(59, 130, 246, 0.25)' : 'rgba(236, 72, 153, 0.25)',
+                color: isConference ? '#93c5fd' : '#f472b6',
+                borderColor: isConference ? 'rgba(59, 130, 246, 0.5)' : 'rgba(236, 72, 153, 0.5)',
+                fontWeight: 700,
+              }}
+            >
+              {isConference ? '🎤 Conférence' : '🛠️ Workshop'}
+            </span>
             {w.isRegistrationClosed ? (
               <span className="badge-reg required" style={{ background: 'rgba(239, 68, 68, 0.25)', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.5)' }}>
                 🔒 Inscriptions closes
@@ -702,10 +750,14 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
 
           <div className="detail-location-row">
             <span className="detail-location-icon">📍</span>
-            <span className="detail-location-text">{w.location}</span>
+            <div className="detail-location-text">
+              <span className="detail-room-title">{w.room?.name || w.location}</span>
+              {w.room?.building && <span className="detail-room-meta"> · Bâtiment {w.room.building}</span>}
+              {w.room?.floor !== null && w.room?.floor !== undefined && <span className="detail-room-meta"> · Étage {w.room.floor}</span>}
+            </div>
             <Link
               to="/map"
-              search={{ places: w.location } as any}
+              search={{ places: w.room?.name || w.location } as any}
               className="detail-map-link"
               onClick={onClose}
             >
@@ -769,6 +821,7 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
                   const isBlockedByOtherSlot = !isReg && Boolean(w.onlyOneSlotPerUser) && hasWorkshopReg
 
                   const isDisabled = isPast || (isClosed && !isReg) || isBlockedByOtherSlot || (spots !== null && spots.available === 0 && !isReg)
+                  const sessionRoomName = d.room?.name || d.location || w.room?.name || w.location
 
                   return (
                     <div key={d.id} className={`detail-slot-card ${isReg ? 'registered' : ''} ${isPast ? 'past' : ''}`}>
@@ -791,10 +844,10 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
                         )}
                       </div>
                       <div className="detail-slot-time">
-                        {formatDateTimeRange(d.startTime, d.endTime)}
-                        {(d.room?.name || d.location) && (d.room?.name || d.location) !== (w.room?.name || w.location) && (
-                          <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', opacity: 0.85 }}>
-                            📍 {d.room?.name || d.location}
+                        <span>🕒 {formatDateTimeRange(d.startTime, d.endTime)}</span>
+                        {sessionRoomName && (
+                          <span className="detail-slot-room-tag">
+                            📍 <strong>{sessionRoomName}</strong>
                           </span>
                         )}
                       </div>

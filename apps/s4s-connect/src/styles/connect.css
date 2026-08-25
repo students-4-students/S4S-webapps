@@ -1373,11 +1373,17 @@ body:has(.map-page-container) .app-main {
   position: absolute;
   top: 0.65rem;
   left: 0.65rem;
-  right: 0.65rem;
+  right: 3.2rem; /* Reserves space so badges never overlap the top-right favorite button */
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  z-index: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.workshop-badge-container .badge-reg {
+  pointer-events: auto;
 }
 
 .badge-reg {
@@ -1427,20 +1433,69 @@ body:has(.map-page-container) .app-main {
 }
 
 .workshop-card-location {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  color: rgba(238, 212, 241, 0.7);
-  font-size: 0.8rem;
-  font-weight: 500;
+  gap: 0.4rem;
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 0.5rem;
+  padding: 0.3rem 0.65rem;
+  width: fit-content;
+  max-width: 100%;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  box-sizing: border-box;
 }
 
-.workshop-card-location span {
-  flex: 1;
-  min-width: 0;
+.workshop-card-location:hover {
+  background: rgba(255, 102, 179, 0.2);
+  border-color: rgba(255, 102, 179, 0.4);
+  color: #ff99cc;
+}
+
+.workshop-card-location .location-icon {
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.workshop-card-location .location-name {
+  font-weight: 700;
+  color: #ffffff;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.workshop-card-location .location-building {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.slot-location-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.15rem;
+}
+
+.slot-room-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.5rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  line-height: 1.3;
 }
 
 .workshop-card-desc {
@@ -2067,23 +2122,38 @@ body:has(.map-page-container) .app-main {
 .detail-location-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 0.65rem;
-  padding: 0.65rem 0.9rem;
+  gap: 0.65rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
 }
 
 .detail-location-icon {
-  font-size: 0.95rem;
+  font-size: 1.1rem;
   flex-shrink: 0;
 }
 
 .detail-location-text {
-  font-size: 0.88rem;
-  color: rgba(238, 212, 241, 0.85);
+  font-size: 0.95rem;
+  color: #ffffff;
   font-weight: 600;
   flex: 1;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.detail-room-title {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.detail-room-meta {
+  font-size: 0.84rem;
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 500;
 }
 
 .detail-map-link {
@@ -2169,6 +2239,23 @@ body:has(.map-page-container) .app-main {
   font-weight: 600;
   color: white;
   line-height: 1.3;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.detail-slot-room-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.12rem 0.5rem;
+  background: rgba(255, 102, 179, 0.15);
+  border: 1px solid rgba(255, 102, 179, 0.3);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #ff99cc;
 }
 
 /* Registration button in detail */

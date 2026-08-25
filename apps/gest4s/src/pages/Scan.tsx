@@ -8,7 +8,6 @@ type Entrance = 'A' | 'B'
 type ScanResult =
   | { status: 'OK'; name: string; section: string; group: string; time: Date }
   | { status: 'ALREADY_SCANNED'; name: string; section: string; scannedAt: Date }
-  | { status: 'WRONG_ENTRANCE'; name: string; section: string; expected: string; time: Date }
   | { status: 'ERROR'; message: string }
 
 type FeedbackState = ScanResult & { key: number }
@@ -60,9 +59,6 @@ export default function Scan() {
       } else if (result.status === 'ALREADY_SCANNED') {
         const r = result as { status: 'ALREADY_SCANNED'; scannedAt: string | Date }
         showFeedback({ status: 'ALREADY_SCANNED', name, section, scannedAt: new Date(r.scannedAt) })
-      } else if (result.status === 'WRONG_ENTRANCE') {
-        const r = result as { status: 'WRONG_ENTRANCE'; expectedEntrance: string }
-        showFeedback({ status: 'WRONG_ENTRANCE', name, section, expected: r.expectedEntrance, time: new Date() })
       }
     } catch (err: any) {
       showFeedback({ status: 'ERROR', message: err?.message ?? 'Erreur inconnue' })
@@ -91,9 +87,6 @@ export default function Scan() {
         } else if (result.status === 'ALREADY_SCANNED') {
           const r = result as { status: 'ALREADY_SCANNED'; scannedAt: string | Date }
           showFeedback({ status: 'ALREADY_SCANNED', name, section, scannedAt: new Date(r.scannedAt) })
-        } else if (result.status === 'WRONG_ENTRANCE') {
-          const r = result as { status: 'WRONG_ENTRANCE'; expectedEntrance: string }
-          showFeedback({ status: 'WRONG_ENTRANCE', name, section, expected: r.expectedEntrance, time: new Date() })
         }
       } catch (err: any) {
         showFeedback({ status: 'ERROR', message: err?.message ?? 'Erreur inconnue' })
@@ -136,6 +129,8 @@ export default function Scan() {
   }, []) // intentionally empty — camera starts once and stays on
 
   const scannedPercent = stats ? Math.round((stats.scanned / Math.max(stats.total, 1)) * 100) : 0
+  const scannedPercentA = stats && (stats.totalA ?? 0) > 0 ? Math.round((stats.scannedA / (stats.totalA ?? 1)) * 100) : null
+  const scannedPercentB = stats && (stats.totalB ?? 0) > 0 ? Math.round((stats.scannedB / (stats.totalB ?? 1)) * 100) : null
 
   return (
     <div className="scan-page">
@@ -145,22 +140,30 @@ export default function Scan() {
         <div className="scan-stats-bar">
           <div className="scan-stat-pill">
             <div className="stat-value">{stats.scanned}/{stats.total}</div>
-            <div className="stat-label">Scannés ({scannedPercent}%)</div>
+            <div className="stat-label">Total ({scannedPercent}%)</div>
           </div>
           <div className="scan-stat-pill pill-a">
-            <div className="stat-value">{stats.scannedA}</div>
-            <div className="stat-label">Entrée A</div>
+            <div className="stat-value">
+              {stats.totalA ? `${stats.scannedA}/${stats.totalA}` : stats.scannedA}
+            </div>
+            <div className="stat-label">
+              Porte A {scannedPercentA !== null ? `(${scannedPercentA}%)` : ''}
+            </div>
           </div>
           <div className="scan-stat-pill pill-b">
-            <div className="stat-value">{stats.scannedB}</div>
-            <div className="stat-label">Entrée B</div>
+            <div className="stat-value">
+              {stats.totalB ? `${stats.scannedB}/${stats.totalB}` : stats.scannedB}
+            </div>
+            <div className="stat-label">
+              Porte B {scannedPercentB !== null ? `(${scannedPercentB}%)` : ''}
+            </div>
           </div>
         </div>
       )}
 
       {/* ── Entrance selector ── */}
       <div className="entrance-selector">
-        <h2>Entrée active</h2>
+        <h2>Porte active</h2>
         <div className="entrance-buttons">
           {(['A', 'B'] as const).map((grp) => (
             <button
@@ -168,8 +171,10 @@ export default function Scan() {
               className={`entrance-btn entrance-btn-${grp.toLowerCase()} ${entrance === grp ? 'active' : ''}`}
               onClick={() => setEntrance(grp)}
             >
-              <span className="btn-group-label">{grp}</span>
-              <span className="btn-sub">Sélectionner</span>
+              <span className="btn-group-label">Porte {grp}</span>
+              <span className="btn-sub">
+                {stats ? `${grp === 'A' ? stats.scannedA : stats.scannedB} scannés` : 'Sélectionner'}
+              </span>
             </button>
           ))}
         </div>
@@ -183,7 +188,7 @@ export default function Scan() {
             <span>Caméra active</span>
             {entrance && (
               <span className={`scanner-entrance-badge badge-${entrance.toLowerCase()}`}>
-                Entrée {entrance}
+                Porte {entrance}
               </span>
             )}
           </div>
@@ -192,7 +197,7 @@ export default function Scan() {
             {!entrance && (
               <div className="scanner-no-entrance">
                 <span className="arrow-up">☝️</span>
-                <p>Sélectionnez une entrée<br />avant de scanner</p>
+                <p>Sélectionnez une porte<br />avant de scanner</p>
               </div>
             )}
           </div>
@@ -201,18 +206,17 @@ export default function Scan() {
 
       {/* ── Last scan result ── */}
       {lastResult && (
-        <div className={`last-scan result-${lastResult.status === 'OK' ? 'ok' : lastResult.status === 'WRONG_ENTRANCE' ? 'warning' : 'error'}`}>
+        <div className={`last-scan result-${lastResult.status === 'OK' ? 'ok' : 'error'}`}>
           <span className="last-scan-icon">
-            {lastResult.status === 'OK' ? '✅' : lastResult.status === 'WRONG_ENTRANCE' ? '⚠️' : lastResult.status === 'ALREADY_SCANNED' ? '🔄' : '❌'}
+            {lastResult.status === 'OK' ? '✅' : lastResult.status === 'ALREADY_SCANNED' ? '🔄' : '❌'}
           </span>
           <div className="last-scan-info">
             <div className="last-scan-name">
               {'name' in lastResult ? lastResult.name : 'Erreur'}
             </div>
             <div className="last-scan-detail">
-              {lastResult.status === 'OK' && `✓ Validé · ${lastResult.section}`}
+              {lastResult.status === 'OK' && `✓ Validé (Porte ${lastResult.group}) · ${lastResult.section}`}
               {lastResult.status === 'ALREADY_SCANNED' && `Déjà scanné · ${lastResult.section}`}
-              {lastResult.status === 'WRONG_ENTRANCE' && `Devrait être à l'entrée ${lastResult.expected} · ${lastResult.section}`}
               {lastResult.status === 'ERROR' && lastResult.message}
             </div>
           </div>
@@ -230,33 +234,25 @@ export default function Scan() {
       {feedback && (
         <div
           key={feedback.key}
-          className={`scan-feedback feedback-${
-            feedback.status === 'OK' ? 'ok' :
-            feedback.status === 'WRONG_ENTRANCE' ? 'warning' : 'error'
-          }`}
+          className={`scan-feedback feedback-${feedback.status === 'OK' ? 'ok' : 'error'}`}
           onClick={() => setFeedback(null)}
         >
           <div className="feedback-content">
             <span className="feedback-icon">
               {feedback.status === 'OK' ? '✅' :
-               feedback.status === 'ALREADY_SCANNED' ? '🔄' :
-               feedback.status === 'WRONG_ENTRANCE' ? '⚠️' : '❌'}
+               feedback.status === 'ALREADY_SCANNED' ? '🔄' : '❌'}
             </span>
             <p className="feedback-title">
               {feedback.status === 'OK' ? 'Bienvenue !' :
-               feedback.status === 'ALREADY_SCANNED' ? 'Déjà scanné' :
-               feedback.status === 'WRONG_ENTRANCE' ? 'Mauvaise entrée' : 'Erreur'}
+               feedback.status === 'ALREADY_SCANNED' ? 'Déjà scanné' : 'Erreur'}
             </p>
             {'name' in feedback && (
               <p className="feedback-name">{feedback.name}</p>
             )}
             <p className="feedback-detail">
-              {feedback.status === 'OK' && `Entrée ${feedback.group} · ${feedback.section}`}
+              {feedback.status === 'OK' && `Porte ${feedback.group} · ${feedback.section}`}
               {feedback.status === 'ALREADY_SCANNED' && (
                 <>Scanné à {(feedback.scannedAt as Date).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })}</>
-              )}
-              {feedback.status === 'WRONG_ENTRANCE' && (
-                <span className="feedback-badge">→ Entrée {feedback.expected}</span>
               )}
               {feedback.status === 'ERROR' && feedback.message}
             </p>
@@ -266,3 +262,5 @@ export default function Scan() {
     </div>
   )
 }
+
+

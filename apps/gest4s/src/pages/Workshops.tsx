@@ -33,6 +33,7 @@ interface Workshop {
   } | null
   description: string
   image: string | null
+  category?: string | null
   requiresRegistration: boolean
   onlyOneSlotPerUser?: boolean
   isRegistrationClosed?: boolean
@@ -59,6 +60,7 @@ export default function Workshops() {
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('')
   const [registrationFilter, setRegistrationFilter] = useState<'all' | 'required' | 'open'>('all')
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'Workshop' | 'Conférences'>('all')
   const [timeFilter, setTimeFilter] = useState<'all' | 'upcoming' | 'past'>('all')
 
   // Drag and Drop & Image tab state
@@ -67,6 +69,7 @@ export default function Workshops() {
 
   // Form State
   const [title, setTitle] = useState('')
+  const [category, setCategory] = useState<string>('Workshop')
   const [selectedRoomId, setSelectedRoomId] = useState<string>('')
   const [customLocation, setCustomLocation] = useState<string>('')
   const [location, setLocation] = useState('')
@@ -317,6 +320,7 @@ export default function Workshops() {
     setDescription('')
     setImage('')
     setImageTab('file')
+    setCategory('Workshop')
     setRequiresRegistration(false)
     setOnlyOneSlotPerUser(false)
     setIsRegistrationClosed(false)
@@ -339,6 +343,7 @@ export default function Workshops() {
   const openEditModal = (w: Workshop) => {
     setEditingWorkshop(w)
     setTitle(w.title)
+    setCategory(w.category || 'Workshop')
     
     // Resolve workshop room
     let initialRoomId = ''
@@ -564,6 +569,7 @@ export default function Workshops() {
 
     const payload = {
       title: title.trim(),
+      category: category || 'Workshop',
       location: finalLocation,
       roomId: finalRoomId,
       description: description.trim(),
@@ -628,6 +634,10 @@ export default function Workshops() {
         (registrationFilter === 'required' && w.requiresRegistration) ||
         (registrationFilter === 'open' && !w.requiresRegistration)
 
+      const matchesCategory =
+        categoryFilter === 'all' ||
+        (w.category || 'Workshop') === categoryFilter
+
       let matchesTime = true
       if (timeFilter !== 'all') {
         const hasUpcomingSession = w.dates.some(d => new Date(d.endTime).getTime() > now)
@@ -638,17 +648,17 @@ export default function Workshops() {
         }
       }
 
-      return matchesSearch && matchesReg && matchesTime
+      return matchesSearch && matchesReg && matchesCategory && matchesTime
     })
-  }, [workshops, searchQuery, registrationFilter, timeFilter])
+  }, [workshops, searchQuery, registrationFilter, categoryFilter, timeFilter])
 
-  const hasActiveFilters = searchQuery !== '' || registrationFilter !== 'all' || timeFilter !== 'all'
+  const hasActiveFilters = searchQuery !== '' || registrationFilter !== 'all' || categoryFilter !== 'all' || timeFilter !== 'all'
 
   // Active Participants List for Modal
   const currentWorkshopParticipants = useMemo(() => {
     if (!usersModalWorkshop) return []
     return getWorkshopParticipants(usersModalWorkshop)
-  }, [usersModalWorkshop, participantsMap, dbStudents])
+  }, [usersModalWorkshop])
 
   const filteredParticipants = useMemo(() => {
     return currentWorkshopParticipants.filter(p => {
@@ -693,6 +703,16 @@ export default function Workshops() {
 
         <div className="filter-group">
           <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value as any)}
+            className="filter-select"
+          >
+            <option value="all">Tous les types</option>
+            <option value="Workshop">🛠️ Workshops</option>
+            <option value="Conférences">🎤 Conférences</option>
+          </select>
+
+          <select
             value={registrationFilter}
             onChange={(e) => setRegistrationFilter(e.target.value as any)}
             className="filter-select"
@@ -718,6 +738,7 @@ export default function Workshops() {
               onClick={() => {
                 setSearchQuery('')
                 setRegistrationFilter('all')
+                setCategoryFilter('all')
                 setTimeFilter('all')
               }}
             >
@@ -726,7 +747,7 @@ export default function Workshops() {
           )}
         </div>
         <button className="btn-primary" onClick={openCreateModal}>
-          <span>+ Créer un workshop</span>
+          <span>+ Créer un workshop / conférence</span>
         </button>
       </div>
 
@@ -742,13 +763,14 @@ export default function Workshops() {
             <div className="empty-state-icon">🎨</div>
             {hasActiveFilters ? (
               <>
-                <h3>Aucun workshop ne correspond à votre recherche</h3>
+                <h3>Aucun événement ne correspond à votre recherche</h3>
                 <p>Essayez de modifier vos filtres ou termes de recherche.</p>
                 <button
                   className="btn-reset-filters-large"
                   onClick={() => {
                     setSearchQuery('')
                     setRegistrationFilter('all')
+                    setCategoryFilter('all')
                     setTimeFilter('all')
                   }}
                 >
@@ -757,10 +779,10 @@ export default function Workshops() {
               </>
             ) : (
               <>
-                <h3>Aucun workshop créé pour le moment</h3>
-                <p>Commencez par ajouter le premier workshop de la semaine d'intégration.</p>
+                <h3>Aucun workshop ou conférence créé pour le moment</h3>
+                <p>Commencez par ajouter le premier événement de la semaine d'intégration.</p>
                 <button className="btn-create-workshop" onClick={openCreateModal}>
-                  + Créer le premier workshop
+                  + Créer le premier événement
                 </button>
               </>
             )}
@@ -773,6 +795,7 @@ export default function Workshops() {
               )
               const participantsList = getWorkshopParticipants(w)
               const displayLocation = w.room?.name || w.location
+              const isConference = (w.category || 'Workshop') === 'Conférences'
 
               return (
                 <div key={w.id} className="workshop-card">
@@ -788,10 +811,21 @@ export default function Workshops() {
                       />
                     ) : (
                       <div className="workshop-placeholder-image">
-                        <span>🎨</span>
+                        <span>{isConference ? '🎤' : '🎨'}</span>
                       </div>
                     )}
                     <div className="workshop-badge-row">
+                      <span
+                        className="badge"
+                        style={{
+                          background: isConference ? 'rgba(59, 130, 246, 0.25)' : 'rgba(236, 72, 153, 0.25)',
+                          color: isConference ? '#93c5fd' : '#f472b6',
+                          border: isConference ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid rgba(236, 72, 153, 0.5)',
+                          fontWeight: 700,
+                        }}
+                      >
+                        {isConference ? '🎤 Conférence' : '🛠️ Workshop'}
+                      </span>
                       {w.isRegistrationClosed ? (
                         <span className="badge badge-registration" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)' }}>
                           🔒 Inscriptions closes
@@ -918,16 +952,42 @@ export default function Workshops() {
                 </div>
               )}
 
-              <label>
-                Titre du workshop *
-                <input
-                  type="text"
-                  required
-                  placeholder="Titre du workshop"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
-              </label>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: '2 1 250px' }}>
+                  <label>
+                    Titre *
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Conférence IA & Futur, Workshop Git..."
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                    />
+                  </label>
+                </div>
+
+                <div style={{ flex: '1 1 180px' }}>
+                  <label>
+                    Catégorie *
+                    <select
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      style={{
+                        padding: '0.65rem 0.85rem',
+                        background: 'var(--ws-bg-input)',
+                        border: '1px solid rgba(238, 212, 241, 0.2)',
+                        borderRadius: '0.6rem',
+                        color: '#ffffff',
+                        fontWeight: 600,
+                        width: '100%',
+                      }}
+                    >
+                      <option value="Workshop">🛠️ Workshop / Atelier</option>
+                      <option value="Conférences">🎤 Conférence / Conférences</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
 
               {/* Room Picker Section */}
               <div className="form-group-full">

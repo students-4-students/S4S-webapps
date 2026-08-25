@@ -357,6 +357,7 @@ model Workshop {
   room                    Room?             @relation("WorkshopRooms", fields: [roomId], references: [id], onDelete: SetNull)
   description             String
   image                   String?           // image URL or path
+  category                String?           @default("Workshop") // "Workshop", "Conférences", etc.
   requiresRegistration    Boolean           @default(false)
   onlyOneSlotPerUser      Boolean           @default(false)   // User can only register to 1 slot of this workshop
   isRegistrationClosed    Boolean           @default(false)   // Registrations closed by admin

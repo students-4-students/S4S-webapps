@@ -72,7 +72,7 @@ export default function Home() {
             workshopTitle: w.title,
             startTime: d.startTime as string,
             endTime: d.endTime as string,
-            location: w.location,
+            location: (d as any).room?.name || d.location || (w as any).room?.name || w.location,
           })
         }
       })
