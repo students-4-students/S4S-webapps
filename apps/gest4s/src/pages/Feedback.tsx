@@ -8,6 +8,7 @@ import {
   EmptyState,
   LoadingSpinner,
 } from '@s4s/ui'
+import { LIKERT_5_OPTIONS } from '@s4s/types'
 import '../../styles/feedback.css'
 
 
@@ -591,13 +592,18 @@ export default function Gest4SFeedback() {
 
                       return (
                         <div key={q.id} style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '10px', padding: '1.1rem', border: '1px solid rgba(255,255,255,0.1)' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                             <h4 style={{ margin: 0, color: '#ffffff', fontSize: '1rem', fontWeight: 600 }}>
                               Q{qIdx + 1}. {q.title}
                             </h4>
-                            <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.12)', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
-                              Type: {q.type}
-                            </span>
+                            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.78rem', color: q.required ? '#fca5a5' : 'rgba(255,255,255,0.7)', background: q.required ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.12)', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                                {q.required ? 'Obligatoire' : 'Optionnel'}
+                              </span>
+                              <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.12)', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                                Type: {q.type}
+                              </span>
+                            </div>
                           </div>
 
                           {/* Likert 5 Scale Results */}
@@ -828,7 +834,7 @@ export default function Gest4SFeedback() {
                             />
                           </div>
 
-                          <div style={{ flex: 1 }}>
+                          <div style={{ flex: 1, minWidth: '150px' }}>
                             <select
                               value={q.type}
                               onChange={(e) => updateQuestionType(pageIdx, qIdx, e.target.value as QuestionType)}
@@ -842,17 +848,57 @@ export default function Gest4SFeedback() {
                                 fontSize: '0.85rem',
                               }}
                             >
-                              <option value="LIKERT_5">Échelle Likert (5 niveaux)</option>
-                              <option value="OPEN_TEXT">Réponse texte ouverte</option>
+                              <option value="LIKERT_5">Échelle Likert (5)</option>
+                              <option value="OPEN_TEXT">Texte libre</option>
                               <option value="SINGLE_CHOICE">Choix unique (Radio)</option>
-                              <option value="MULTIPLE">Choix multiples (Cocher)</option>
+                              <option value="MULTIPLE">Choix multiples</option>
                             </select>
                           </div>
+
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              fontSize: '0.8rem',
+                              color: q.required ? '#fca5a5' : 'rgba(255,255,255,0.6)',
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap',
+                              userSelect: 'none',
+                              padding: '0.35rem 0.5rem',
+                              background: q.required ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.05)',
+                              border: q.required ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(255,255,255,0.1)',
+                              borderRadius: '6px',
+                            }}
+                            title="Indique si la réponse à cette question est obligatoire pour soumettre le sondage"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={q.required}
+                              onChange={(e) => {
+                                const checked = e.target.checked
+                                setPages((prev) =>
+                                  prev.map((p, pI) => {
+                                    if (pI !== pageIdx) return p
+                                    return {
+                                      ...p,
+                                      questions: p.questions.map((quest, qI) =>
+                                        qI === qIdx ? { ...quest, required: checked } : quest
+                                      ),
+                                    }
+                                  })
+                                )
+                              }}
+                              style={{ accentColor: '#ec4899', cursor: 'pointer' }}
+                            />
+                            Obligatoire
+                          </label>
 
                           <button
                             type="button"
                             onClick={() => removeQuestion(pageIdx, qIdx)}
                             style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1rem' }}
+                            title="Supprimer la question"
                           >
                             ✕
                           </button>

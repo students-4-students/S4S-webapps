@@ -46,17 +46,31 @@ export default function S4SConnectFeedback() {
   }
 
   const handleLikertSelect = (questionId: string, value: string) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: { textAnswer: value },
-    }))
+    setAnswers((prev) => {
+      if (prev[questionId]?.textAnswer === value) {
+        const next = { ...prev }
+        delete next[questionId]
+        return next
+      }
+      return {
+        ...prev,
+        [questionId]: { textAnswer: value },
+      }
+    })
   }
 
   const handleSingleChoiceSelect = (questionId: string, optionId: string) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: { optionId },
-    }))
+    setAnswers((prev) => {
+      if (prev[questionId]?.optionId === optionId) {
+        const next = { ...prev }
+        delete next[questionId]
+        return next
+      }
+      return {
+        ...prev,
+        [questionId]: { optionId },
+      }
+    })
   }
 
   const handleMultipleSelect = (questionId: string, optionId: string) => {
@@ -64,6 +78,11 @@ export default function S4SConnectFeedback() {
       const currentOptIds = prev[questionId]?.optionIds || []
       const exists = currentOptIds.includes(optionId)
       const nextOptIds = exists ? currentOptIds.filter((id) => id !== optionId) : [...currentOptIds, optionId]
+      if (nextOptIds.length === 0) {
+        const next = { ...prev }
+        delete next[questionId]
+        return next
+      }
       return {
         ...prev,
         [questionId]: { optionIds: nextOptIds },
@@ -72,10 +91,17 @@ export default function S4SConnectFeedback() {
   }
 
   const handleTextChange = (questionId: string, text: string) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: { textAnswer: text },
-    }))
+    setAnswers((prev) => {
+      if (!text.trim()) {
+        const next = { ...prev }
+        delete next[questionId]
+        return next
+      }
+      return {
+        ...prev,
+        [questionId]: { textAnswer: text },
+      }
+    })
   }
 
   // Handle survey submission
@@ -102,12 +128,19 @@ export default function S4SConnectFeedback() {
       }
     }
 
-    const answersPayload = Object.entries(answers).map(([questionId, ansVal]) => ({
-      questionId,
-      textAnswer: ansVal.textAnswer,
-      optionId: ansVal.optionId,
-      optionIds: ansVal.optionIds,
-    }))
+    const answersPayload = Object.entries(answers)
+      .map(([questionId, ansVal]) => ({
+        questionId,
+        textAnswer: ansVal.textAnswer?.trim() || undefined,
+        optionId: ansVal.optionId,
+        optionIds: ansVal.optionIds,
+      }))
+      .filter((ans) => {
+        const hasText = ans.textAnswer !== undefined && ans.textAnswer !== null && ans.textAnswer.trim() !== ''
+        const hasOption = !!ans.optionId
+        const hasOptions = ans.optionIds && ans.optionIds.length > 0
+        return hasText || hasOption || hasOptions
+      })
 
     await submitMutation.mutateAsync({
       surveyId: activeSurvey.id,
@@ -216,7 +249,7 @@ export default function S4SConnectFeedback() {
                 return (
                   <div key={q.id} style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '12px', padding: '1rem', border: '1px solid rgba(255,255,255,0.06)' }}>
                     <label style={{ display: 'block', fontWeight: 600, fontSize: '0.98rem', marginBottom: '0.25rem' }}>
-                      {qIdx + 1}. {q.title} {q.required && <span style={{ color: '#ef4444' }}>*</span>}
+                      {qIdx + 1}. {q.title} {q.required ? <span style={{ color: '#ef4444' }}>*</span> : <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.45)', fontWeight: 400, marginLeft: '0.4rem' }}>(Optionnel)</span>}
                     </label>
                     {q.description && (
                       <span style={{ display: 'block', fontSize: '0.82rem', color: 'rgba(255,255,255,0.6)', marginBottom: '0.75rem' }}>

@@ -408,15 +408,18 @@ export const feedbackRouter = router({
             answerCreates.push({
               questionId: ans.questionId,
               optionId: optId,
-              textAnswer: ans.textAnswer,
+              textAnswer: ans.textAnswer?.trim() || null,
             })
           }
         } else {
-          answerCreates.push({
-            questionId: ans.questionId,
-            optionId: ans.optionId,
-            textAnswer: ans.textAnswer,
-          })
+          const text = ans.textAnswer?.trim()
+          if (text || ans.optionId) {
+            answerCreates.push({
+              questionId: ans.questionId,
+              optionId: ans.optionId || null,
+              textAnswer: text || null,
+            })
+          }
         }
       }
 
