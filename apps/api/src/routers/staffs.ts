@@ -87,13 +87,18 @@ export const staffsRouter = router({
           phone: z.string().optional().nullable(),
           telegramUsername: z.string().optional().nullable(),
           score: z.number().int().min(0).optional().default(0),
+          speakerClassNames: z.array(z.string()).optional().default([]),
+          assistantClassNames: z.array(z.string()).optional().default([]),
+          rcClassNames: z.array(z.string()).optional().default([]),
         })
       )
     )
     .mutation(async ({ input, ctx }) => {
       console.log(`[DEBUG] [StaffsRouter] Bulk importing ${input.length} staff members`);
       
+      const allMatchingClasses = await ctx.db.class.findMany({ select: { id: true, name: true } });
       const createdStaffs: any[] = [];
+
       for (const item of input) {
         const staff = await ctx.db.staffMember.create({
           data: {
@@ -108,6 +113,46 @@ export const staffsRouter = router({
             score: item.score,
           },
         });
+
+        // Link classes if provided
+        const speakerClassNames = item.speakerClassNames || [];
+        const assistantClassNames = item.assistantClassNames || [];
+        const rcClassNames = item.rcClassNames || [];
+
+        if (speakerClassNames.length > 0) {
+          await ctx.db.scheduleSlot.updateMany({
+            where: { title: { in: speakerClassNames } },
+            data: { speakerId: staff.id },
+          });
+        }
+        if (assistantClassNames.length > 0) {
+          await ctx.db.scheduleSlot.updateMany({
+            where: { title: { in: assistantClassNames } },
+            data: { assistantId: staff.id },
+          });
+        }
+        if (rcClassNames.length > 0) {
+          await ctx.db.scheduleSlot.updateMany({
+            where: { title: { in: rcClassNames } },
+            data: { rcId: staff.id },
+          });
+        }
+
+        const speakerClassIds = allMatchingClasses.filter(c => speakerClassNames.includes(c.name)).map(c => ({ id: c.id }));
+        const assistantClassIds = allMatchingClasses.filter(c => assistantClassNames.includes(c.name)).map(c => ({ id: c.id }));
+        const rcClassIds = allMatchingClasses.filter(c => rcClassNames.includes(c.name)).map(c => ({ id: c.id }));
+
+        if (speakerClassIds.length > 0 || assistantClassIds.length > 0 || rcClassIds.length > 0) {
+          await ctx.db.staffMember.update({
+            where: { id: staff.id },
+            data: {
+              Class_SpeakerClasses: { set: speakerClassIds },
+              Class_AssistantClasses: { set: assistantClassIds },
+              Class_RcClasses: { set: rcClassIds },
+            },
+          });
+        }
+
         createdStaffs.push(staff);
       }
       

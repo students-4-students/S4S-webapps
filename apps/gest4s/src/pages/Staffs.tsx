@@ -13,17 +13,14 @@ import '../../styles/staffs.css'
 import '../../styles/dashboard.css'
 
 const ROLES = [
-  'Comité',
-  'Équipier Logistique',
-  'Équipier Catering',
-  'Équipier IT',
-  'Équipier Communication',
+  'Speaker',
   'Assistant',
   'RC',
-  'Speaker',
-  'Staff Logistique',
-  'Staff Catering',
-  'Staff Animation',
+  'Staffs Logistique',
+  'Staffs Catering',
+  'Staffs Animation',
+  'Staffs Comm',
+  'Comité',
 ]
 
 function Staffs() {
@@ -313,13 +310,16 @@ function Staffs() {
         const formatted = rawParsed.map((item) => ({
           firstName: item.firstName,
           lastName: item.lastName,
-          role: item.role || 'Équipier Logistique',
+          role: item.role || 'Staffs Logistique',
           status: 'ACTIVE' as const,
           isPresent: false,
           email: item.email,
           phone: item.phone,
           telegramUsername: item.telegramUsername,
           score: 0,
+          speakerClassNames: item.speakerClassNames || [],
+          assistantClassNames: item.assistantClassNames || [],
+          rcClassNames: item.rcClassNames || [],
         }))
 
         await importMutation.mutateAsync(formatted)
