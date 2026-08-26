@@ -15,10 +15,7 @@ function isLocationMatch(locationString: string | null | undefined, roomName: st
   if (!locationString) return false
   const target = normalizeRoomName(roomName)
   const tokens = locationString.split(/[,;/]+/).map(normalizeRoomName).filter(Boolean)
-  if (tokens.includes(target)) return true
-  if (tokens.some((tok) => tok === target || tok.includes(target) || target.includes(tok))) return true
-  const fullLoc = normalizeRoomName(locationString)
-  return fullLoc.includes(target) || target.includes(fullLoc)
+  return tokens.includes(target)
 }
 
 export function AvailableRoomsCard() {

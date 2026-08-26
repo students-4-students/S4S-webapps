@@ -46,11 +46,61 @@ export const MultiSelectCombobox: React.FC<MultiSelectComboboxProps> = ({
   }, [options, selectedIds])
 
   const filteredOptions = useMemo(() => {
+    const searchTrimmed = search.trim().toLowerCase()
     return options.filter((o) => {
-      const matchesSearch =
-        !search.trim() ||
-        o.label.toLowerCase().includes(search.toLowerCase()) ||
-        (o.sublabel && o.sublabel.toLowerCase().includes(search.toLowerCase()))
+      let matchesSearch = true
+
+      if (searchTrimmed) {
+        const labelLower = o.label.toLowerCase()
+        const sublabelLower = (o.sublabel || '').toLowerCase()
+
+        // 1. Exact match or normalized space match
+        if (
+          labelLower === searchTrimmed ||
+          labelLower.replace(/\s+/g, '') === searchTrimmed.replace(/\s+/g, '')
+        ) {
+          matchesSearch = true
+        } else {
+          const sTokens = searchTrimmed.split(/\s+/).filter(Boolean)
+          const lTokens = labelLower.split(/\s+/).filter(Boolean)
+
+          if (sTokens.length === 1) {
+            const sTok = sTokens[0]
+            const tokenMatch = lTokens.some((lTok) => lTok === sTok || lTok.startsWith(sTok))
+            const subMatch = sublabelLower && (sublabelLower.includes(sTok) || sublabelLower.startsWith(sTok))
+            matchesSearch = Boolean(tokenMatch || subMatch)
+          } else if (sTokens.length <= lTokens.length) {
+            let matchesSequential = true
+            for (let i = 0; i < sTokens.length; i++) {
+              const sTok = sTokens[i]
+              const lTok = lTokens[i]
+              const isLastSearchToken = i === sTokens.length - 1
+
+              if (isLastSearchToken) {
+                if (sTokens.length === lTokens.length) {
+                  if (lTok !== sTok) {
+                    matchesSequential = false
+                    break
+                  }
+                } else {
+                  if (lTok !== sTok && !lTok.startsWith(sTok)) {
+                    matchesSequential = false
+                    break
+                  }
+                }
+              } else {
+                if (lTok !== sTok) {
+                  matchesSequential = false
+                  break
+                }
+              }
+            }
+            matchesSearch = matchesSequential
+          } else {
+            matchesSearch = false
+          }
+        }
+      }
 
       const matchesCat =
         selectedCategory === 'all' ||

@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Link } from '@tanstack/react-router'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 import { trpc } from '../trpc'
 import { Modal, Button, Badge } from '@s4s/ui'
 import CreateClassModal from '../components/CreateClassModal'
@@ -174,7 +176,7 @@ function Schedule() {
   }
 
   // Calculate absolute styling (top, height) for event placement in a 08:00 - 20:00 timeline
-  const calculateCardStyle = (startTime: Date | string, endTime: Date | string) => {
+  const calculateCardStyle = (startTime: Date | string, endTime: Date | string, customHourHeight?: number) => {
     const start = typeof startTime === 'string' ? new Date(startTime) : startTime
     const end = typeof endTime === 'string' ? new Date(endTime) : endTime
 
@@ -188,12 +190,19 @@ function Schedule() {
     const clampedStartMin = Math.max(timelineStartMin, Math.min(timelineEndMin, startMin))
     const clampedEndMin = Math.max(timelineStartMin, Math.min(timelineEndMin, endMin))
 
-    const top = ((clampedStartMin - timelineStartMin) / 60) * HOUR_HEIGHT
-    const height = ((clampedEndMin - clampedStartMin) / 60) * HOUR_HEIGHT
+    const topFraction = (clampedStartMin - timelineStartMin) / 60
+    const heightFraction = (clampedEndMin - clampedStartMin) / 60
+
+    if (customHourHeight) {
+      return {
+        top: `${(topFraction * customHourHeight).toFixed(1)}px`,
+        height: `${Math.max(26, heightFraction * customHourHeight).toFixed(1)}px`,
+      }
+    }
 
     return {
-      top: `${top}px`,
-      height: `${Math.max(38, height)}px`, // minimum height of 38px to keep cards legible
+      top: `calc(${topFraction} * var(--hour-height, 80px))`,
+      height: `max(28px, calc(${heightFraction} * var(--hour-height, 80px)))`,
     }
   }
 
@@ -452,9 +461,6 @@ function Schedule() {
           if (slotRooms.includes(activeUpper)) {
             return true
           }
-          if (slotRooms.some((r: string) => r === activeUpper || r.includes(activeUpper) || activeUpper.includes(r))) {
-            return true
-          }
         }
         return false
       } else if (viewType === 'person') {
@@ -487,6 +493,86 @@ function Schedule() {
 
     return filtered.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
   }
+
+  // Filter slots for a specific room and day for batch room exports
+  const getSlotsForDayAndRoom = (dateStr: string, roomName: string) => {
+    const combinedSlots = [...safeSlots, ...mappedTaskSlots, ...mappedShiftSlots, ...mappedWorkshopSlots]
+    const activeUpper = roomName.trim().toUpperCase()
+
+    const filtered = combinedSlots.filter((slot) => {
+      if (getSlotDateStr(slot.startTime) !== dateStr) return false
+
+      if (slot.room?.name && slot.room.name.trim().toUpperCase() === activeUpper) {
+        return true
+      }
+
+      if (slot.roomId) {
+        const matchedDbRoom = rooms.find((r: any) => r.id === slot.roomId)
+        if (matchedDbRoom && matchedDbRoom.name.trim().toUpperCase() === activeUpper) {
+          return true
+        }
+      }
+
+      if (slot.location) {
+        const slotRooms = slot.location
+          .split(/[,;/]+/)
+          .map((r: string) => r.trim().toUpperCase())
+          .filter((r: string) => r.length > 0)
+        if (slotRooms.includes(activeUpper)) {
+          return true
+        }
+      }
+
+      return false
+    })
+
+    const seenTaskIds = new Set<string>()
+    const deduplicated: typeof filtered = []
+    for (const slot of filtered) {
+      if (slot.isOperationalTask && slot.taskId) {
+        if (seenTaskIds.has(slot.taskId)) continue
+        seenTaskIds.add(slot.taskId)
+      }
+      deduplicated.push(slot)
+    }
+
+    return deduplicated.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+  }
+
+  const allRoomLocations = useMemo(() => {
+    const uniqueLocationsSet = new Set<string>()
+
+    rooms.forEach((r: any) => {
+      if (r.name && r.name.trim()) uniqueLocationsSet.add(r.name.trim())
+    })
+
+    safeSlots.forEach((slot) => {
+      if (slot.location) {
+        const rList = slot.location.split(/[,;/]+/).map((r: string) => r.trim()).filter((r: string) => r.length > 0)
+        rList.forEach((room: string) => uniqueLocationsSet.add(room))
+      }
+      if (slot.room?.name) uniqueLocationsSet.add(slot.room.name.trim())
+    })
+
+    mappedWorkshopSlots.forEach((wSlot) => {
+      if (wSlot.location) {
+        const rList = wSlot.location.split(/[,;/]+/).map((r: string) => r.trim()).filter((r: string) => r.length > 0)
+        rList.forEach((room: string) => uniqueLocationsSet.add(room))
+      }
+      if (wSlot.room?.name) uniqueLocationsSet.add(wSlot.room.name.trim())
+    })
+
+    mappedTaskSlots.forEach((tSlot) => {
+      if (tSlot.location) {
+        const rList = tSlot.location.split(/[,;/]+/).map((r: string) => r.trim()).filter((r: string) => r.length > 0)
+        rList.forEach((room: string) => uniqueLocationsSet.add(room))
+      }
+    })
+
+    const list = Array.from(uniqueLocationsSet)
+    list.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+    return list
+  }, [rooms, safeSlots, mappedWorkshopSlots, mappedTaskSlots])
 
   const handleExportJSON = () => {
     if (!safeSlots || safeSlots.length === 0) {
@@ -611,16 +697,158 @@ function Schedule() {
     URL.revokeObjectURL(url)
   }
 
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
+  const [generatingProgress, setGeneratingProgress] = useState('')
+
+  const handleDownloadPDF = async () => {
+    const element = document.getElementById('schedule-pdf-export')
+    if (!element) return
+
+    try {
+      setIsGeneratingPDF(true)
+
+      // Temporarily ensure element is ready for rendering
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        letterRendering: false,
+        onclone: (clonedDoc) => {
+          const clonedEl = clonedDoc.getElementById('schedule-pdf-export')
+          if (clonedEl) {
+            clonedEl.style.fontFamily = 'Arial, sans-serif'
+          }
+        },
+      })
+
+      const imgData = canvas.toDataURL('image/png')
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4',
+      })
+
+      const pdfWidth = pdf.internal.pageSize.getWidth() // 297mm
+      const pdfHeight = pdf.internal.pageSize.getHeight() // 210mm
+
+      const margin = 6
+      const usableWidth = pdfWidth - margin * 2
+      const usableHeight = pdfHeight - margin * 2
+
+      let imgWidth = usableWidth
+      let imgHeight = (canvas.height * usableWidth) / canvas.width
+
+      if (imgHeight > usableHeight) {
+        imgHeight = usableHeight
+        imgWidth = (canvas.width * usableHeight) / canvas.height
+      }
+
+      const xOffset = margin + (usableWidth - imgWidth) / 2
+      const yOffset = margin + (usableHeight - imgHeight) / 2
+
+      pdf.addImage(imgData, 'PNG', xOffset, yOffset, imgWidth, imgHeight)
+
+      const safeEntityName = (activeEntityId || 'global').replace(/[^a-zA-Z0-9_-]/g, '_')
+      pdf.save(`planning_${viewType}_${safeEntityName}.pdf`)
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      alert('Erreur lors de la génération du PDF.')
+    } finally {
+      setIsGeneratingPDF(false)
+    }
+  }
+
+  const handleDownloadAllRoomsPDF = async () => {
+    if (allRoomLocations.length === 0) {
+      alert('Aucune salle trouvée à exporter.')
+      return
+    }
+
+    try {
+      setIsGeneratingPDF(true)
+      setGeneratingProgress(`0 / ${allRoomLocations.length}`)
+
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4',
+      })
+
+      const pdfWidth = pdf.internal.pageSize.getWidth() // 297mm
+      const pdfHeight = pdf.internal.pageSize.getHeight() // 210mm
+      const margin = 6
+      const usableWidth = pdfWidth - margin * 2
+      const usableHeight = pdfHeight - margin * 2
+
+      for (let i = 0; i < allRoomLocations.length; i++) {
+        const roomName = allRoomLocations[i]
+        setGeneratingProgress(`${i + 1} / ${allRoomLocations.length} (${roomName})`)
+
+        const el = document.getElementById(`schedule-pdf-export-room-${i}`)
+        if (!el) continue
+
+        const canvas = await html2canvas(el, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+          letterRendering: false,
+          onclone: (clonedDoc) => {
+            const clonedEl = clonedDoc.getElementById(`schedule-pdf-export-room-${i}`)
+            if (clonedEl) {
+              clonedEl.style.fontFamily = 'Arial, sans-serif'
+            }
+          },
+        })
+
+        const imgData = canvas.toDataURL('image/png')
+        let imgWidth = usableWidth
+        let imgHeight = (canvas.height * usableWidth) / canvas.width
+
+        if (imgHeight > usableHeight) {
+          imgHeight = usableHeight
+          imgWidth = (canvas.width * usableHeight) / canvas.height
+        }
+
+        const xOffset = margin + (usableWidth - imgWidth) / 2
+        const yOffset = margin + (usableHeight - imgHeight) / 2
+
+        if (i > 0) {
+          pdf.addPage('a4', 'landscape')
+        }
+
+        pdf.addImage(imgData, 'PNG', xOffset, yOffset, imgWidth, imgHeight)
+      }
+
+      pdf.save(`planning_toutes_les_salles_2026.pdf`)
+    } catch (error) {
+      console.error('Error generating all rooms PDF:', error)
+      alert('Erreur lors de la génération du PDF de toutes les salles.')
+    } finally {
+      setIsGeneratingPDF(false)
+      setGeneratingProgress('')
+    }
+  }
+
   return (
     <div className="schedule-page">
-      {/* Top Header Grid Row */}
+      {/* Dedicated Print Banner - visible ONLY when printing */}
+      <div className="print-schedule-banner">
+        <div className="print-banner-left">
+          <div className="print-banner-title">Planning Students 4 Students 2026</div>
+          <div className="print-banner-badge">
+            {viewType === 'section' && `Section : ${activeEntityId}`}
+            {viewType === 'location' && `Salle : ${activeEntityId}`}
+            {viewType === 'person' && `Planning individuel : ${activePerson ? `${activePerson.name} (${activePerson.role})` : 'Non assigné'}`}
+          </div>
+        </div>
+      </div>
+
+      {/* Top Header Grid Row (Interactive UI - hidden in print) */}
       <div className="schedule-header-row">
         <div className="schedule-title-area">
-          <span className="print-subtitle" style={{ display: 'none', color: '#1e293b', fontSize: '1.1rem', fontWeight: 600, marginLeft: '1rem' }}>
-            {viewType === 'section' && `Section: ${activeEntityId}`}
-            {viewType === 'location' && `Salle: ${activeEntityId}`}
-            {viewType === 'person' && `Personne: ${activePerson ? activePerson.name : ''}`}
-          </span>
+          <h1 style={{ margin: 0 }}>Planning</h1>
         </div>
         
         {/* Centered Selector panel */}
@@ -818,15 +1046,41 @@ function Schedule() {
           </div>
           <button
             className="btn-primary"
-            onClick={() => window.print()}
+            onClick={handleDownloadPDF}
+            disabled={isGeneratingPDF}
             style={{
               marginTop: 0,
               background: 'rgba(255, 255, 255, 0.1)',
               border: '1px solid rgba(255, 255, 255, 0.15)',
-              color: 'white'
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              cursor: isGeneratingPDF ? 'not-allowed' : 'pointer',
+              opacity: isGeneratingPDF ? 0.7 : 1,
             }}
+            title="Télécharger la vue actuelle en PDF"
           >
-            🖨️ Imprimer
+            {isGeneratingPDF && !generatingProgress ? '⏳ Génération...' : '📥 Télécharger en PDF'}
+          </button>
+          <button
+            className="btn-primary"
+            onClick={handleDownloadAllRoomsPDF}
+            disabled={isGeneratingPDF}
+            style={{
+              marginTop: 0,
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              cursor: isGeneratingPDF ? 'not-allowed' : 'pointer',
+              opacity: isGeneratingPDF ? 0.7 : 1,
+            }}
+            title="Télécharger le planning complet de chaque salle dans un seul document PDF multi-pages"
+          >
+            {isGeneratingPDF && generatingProgress ? `⏳ ${generatingProgress}` : '🏢 Toutes les salles (PDF)'}
           </button>
         </div>
       </div>
@@ -876,6 +1130,8 @@ function Schedule() {
                       <AbsoluteSlotCard
                         key={slot.id}
                         slot={slot}
+                        viewType={viewType}
+                        activeEntityId={activeEntityId}
                         style={combinedStyle}
                         formatTime={formatTime}
                         onClick={() => {
@@ -896,6 +1152,289 @@ function Schedule() {
           })}
         </div>
       </div>
+
+      {/* Dedicated Print Footer with S4S and AGEPoly logos */}
+      <div className="print-schedule-footer">
+        <div className="print-footer-logos">
+          <img src="/s4s-logo.svg" alt="Students 4 Students" className="print-footer-logo-s4s" />
+          <img src="/agep.svg" alt="AGEPoly" className="print-footer-logo-agep" />
+        </div>
+      </div>
+
+      {/* Hidden layout rendered specifically for High-Definition PDF Export */}
+      <div
+        id="schedule-pdf-export"
+        style={{
+          position: 'fixed',
+          left: '-99999px',
+          top: 0,
+          width: '1520px',
+          backgroundColor: '#ffffff',
+          color: '#312b48',
+          fontFamily: "Arial, Helvetica, sans-serif",
+          letterSpacing: 'normal',
+          wordSpacing: 'normal',
+          padding: '20px 24px 16px 24px',
+          boxSizing: 'border-box',
+          display: 'flex',
+          flexDirection: 'column',
+          zIndex: -1,
+        }}
+      >
+        {/* Banner */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '14px', borderBottom: '3px solid #41335f', marginBottom: '16px' }}>
+          <div style={{ fontSize: '1.65rem', fontWeight: 'bold', color: '#312b48', letterSpacing: 'normal', wordSpacing: 'normal', whiteSpace: 'nowrap' }}>Planning Students 4 Students 2026</div>
+          <div style={{ fontSize: '1.15rem', fontWeight: 'bold', color: '#312b48', background: '#f4eaf3', border: '2px solid #41335f', padding: '6px 18px', borderRadius: '8px', letterSpacing: 'normal', wordSpacing: 'normal', whiteSpace: 'nowrap' }}>
+            {viewType === 'section' && `Section : ${activeEntityId}`}
+            {viewType === 'location' && `Salle : ${activeEntityId}`}
+            {viewType === 'person' && `Planning individuel : ${activePerson ? `${activePerson.name} (${activePerson.role})` : 'Non assigné'}`}
+          </div>
+        </div>
+
+        {/* Grid Container */}
+        <div style={{ border: '2.5px solid #41335f', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#ffffff' }}>
+          {/* Header Row */}
+          <div style={{ display: 'flex', borderBottom: '2.5px solid #41335f', background: '#f4eaf3' }}>
+            <div style={{ width: '70px', flexShrink: 0, height: '54px', borderRight: '1.5px solid #eed4f1' }} />
+            {DAYS.map((day) => (
+              <div key={day.dateStr} style={{ flex: 1, height: '54px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', borderRight: '1.5px solid #eed4f1', boxSizing: 'border-box' }}>
+                <span style={{ fontSize: '1.02rem', fontWeight: 'bold', color: '#312b48', lineHeight: 1.25, letterSpacing: 'normal', wordSpacing: 'normal' }}>{day.fullLabel.split(' ')[0]} {day.fullLabel.split(' ')[1]}</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#41335f', lineHeight: 1.25, letterSpacing: 'normal', wordSpacing: 'normal' }}>{day.fullLabel.split(' ').slice(2).join(' ')}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Body Row (Time column + 8 day columns) */}
+          <div style={{ display: 'flex', height: `${12 * 60}px`, position: 'relative' }}>
+            {/* Time column */}
+            <div style={{ width: '70px', flexShrink: 0, background: '#f4eaf3', borderRight: '2.5px solid #41335f', display: 'flex', flexDirection: 'column' }}>
+              {HOURS.map((hour) => (
+                <div key={hour} style={{ height: '60px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: '6px', fontSize: '0.86rem', fontWeight: 'bold', color: '#312b48', borderBottom: '1px solid #e5d3e4', boxSizing: 'border-box', letterSpacing: 'normal', wordSpacing: 'normal' }}>
+                  {String(hour).padStart(2, '0')}:00
+                </div>
+              ))}
+            </div>
+
+            {/* 8 Day columns */}
+            {DAYS.map((day) => {
+              const daySlots = getSlotsForDay(day.dateStr)
+              const layoutMap = computeOverlappingLayout(daySlots)
+              return (
+                <div key={day.dateStr} style={{ flex: 1, height: `${12 * 60}px`, position: 'relative', borderRight: '1.5px solid #eed4f1', boxSizing: 'border-box' }}>
+                  {/* Hour background lines */}
+                  {HOURS.map((hour) => (
+                    <div key={hour} style={{ height: '60px', borderBottom: '1px solid #f0e2ef', boxSizing: 'border-box' }} />
+                  ))}
+
+                  {/* Absolute Cards */}
+                  <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+                    {daySlots.map((slot) => {
+                      const cardStyle = calculateCardStyle(slot.startTime, slot.endTime, 60)
+                      const sideStyle = layoutMap.get(slot.id)
+                      const combinedStyle = sideStyle
+                        ? { ...cardStyle, left: sideStyle.left, width: sideStyle.width, right: 'auto' }
+                        : cardStyle
+
+                      const displayLocation = viewType === 'location' && activeEntityId && activeEntityId !== 'none'
+                        ? activeEntityId
+                        : slot.location
+
+                      const sectionsList = slot.sections && slot.sections.length > 0
+                        ? slot.sections.map((s: any) => s.name).join(', ')
+                        : slot.section?.name
+
+                      return (
+                        <div
+                          key={slot.id}
+                          className={`slot-card-absolute ${slot.type ? slot.type.toLowerCase() : 'special'}`}
+                          style={{
+                            position: 'absolute',
+                            ...combinedStyle,
+                            borderRadius: '5px',
+                            borderWidth: '1.5px',
+                            borderStyle: 'solid',
+                            borderLeftWidth: '5px',
+                            padding: '4px 6px',
+                            boxSizing: 'border-box',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            overflow: 'hidden',
+                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                            fontFamily: "Arial, Helvetica, sans-serif",
+                            letterSpacing: 'normal',
+                            wordSpacing: 'normal',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
+                            <span style={{ fontSize: '0.70rem', fontWeight: 'bold', color: '#0f172a', background: 'rgba(0, 0, 0, 0.08)', padding: '2px 5px', borderRadius: '3px', lineHeight: 1.2, letterSpacing: 'normal', wordSpacing: 'normal', whiteSpace: 'nowrap' }}>
+                              🕒 {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.78rem', fontWeight: 'bold', color: '#0f172a', lineHeight: 1.3, margin: '2px 0', letterSpacing: 'normal', wordSpacing: 'normal', wordBreak: 'normal', overflowWrap: 'break-word' }}>
+                            {slot.title}
+                          </div>
+                          <div style={{ fontSize: '0.66rem', color: '#334155', fontWeight: 'bold', marginTop: 'auto', display: 'flex', flexWrap: 'wrap', gap: '3px 6px', lineHeight: 1.3, letterSpacing: 'normal', wordSpacing: 'normal' }}>
+                            {displayLocation && <span style={{ whiteSpace: 'nowrap' }}>📍 {displayLocation}</span>}
+                            {viewType !== 'section' && sectionsList && <span style={{ whiteSpace: 'nowrap' }}>👥 {sectionsList}</span>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Footer with Logos */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '20px', marginTop: '12px', paddingTop: '4px' }}>
+          <img src="/s4s-logo.svg" alt="Students 4 Students" style={{ height: '28px', width: '28px', objectFit: 'contain' }} />
+          <img src="/agep.svg" alt="AGEPoly" style={{ height: '24px', width: '105px', objectFit: 'contain' }} />
+        </div>
+      </div>
+
+      {/* Hidden layout rendered for all rooms multi-page PDF Export */}
+      <div
+        id="schedule-all-rooms-pdf-export"
+        style={{
+          position: 'fixed',
+          left: '-99999px',
+          top: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          zIndex: -1,
+        }}
+      >
+        {allRoomLocations.map((roomName, rIdx) => {
+          return (
+            <div
+              key={roomName}
+              id={`schedule-pdf-export-room-${rIdx}`}
+              style={{
+                width: '1520px',
+                backgroundColor: '#ffffff',
+                color: '#312b48',
+                fontFamily: 'Arial, Helvetica, sans-serif',
+                letterSpacing: 'normal',
+                wordSpacing: 'normal',
+                padding: '20px 24px 16px 24px',
+                boxSizing: 'border-box',
+                display: 'flex',
+                flexDirection: 'column',
+                marginBottom: '20px',
+              }}
+            >
+              {/* Banner */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '14px', borderBottom: '3px solid #41335f', marginBottom: '16px' }}>
+                <div style={{ fontSize: '1.65rem', fontWeight: 'bold', color: '#312b48', letterSpacing: 'normal', wordSpacing: 'normal', whiteSpace: 'nowrap' }}>Planning Students 4 Students 2026</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 'bold', color: '#312b48', background: '#f4eaf3', border: '2px solid #41335f', padding: '6px 18px', borderRadius: '8px', letterSpacing: 'normal', wordSpacing: 'normal', whiteSpace: 'nowrap' }}>
+                  Salle : {roomName}
+                </div>
+              </div>
+
+              {/* Grid Container */}
+              <div style={{ border: '2.5px solid #41335f', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#ffffff' }}>
+                {/* Header Row */}
+                <div style={{ display: 'flex', borderBottom: '2.5px solid #41335f', background: '#f4eaf3' }}>
+                  <div style={{ width: '70px', flexShrink: 0, height: '54px', borderRight: '1.5px solid #eed4f1' }} />
+                  {DAYS.map((day) => (
+                    <div key={day.dateStr} style={{ flex: 1, height: '54px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', borderRight: '1.5px solid #eed4f1', boxSizing: 'border-box' }}>
+                      <span style={{ fontSize: '1.02rem', fontWeight: 'bold', color: '#312b48', lineHeight: 1.25, letterSpacing: 'normal', wordSpacing: 'normal' }}>{day.fullLabel.split(' ')[0]} {day.fullLabel.split(' ')[1]}</span>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#41335f', lineHeight: 1.25, letterSpacing: 'normal', wordSpacing: 'normal' }}>{day.fullLabel.split(' ').slice(2).join(' ')}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Body Row (Time column + 8 day columns) */}
+                <div style={{ display: 'flex', height: `${12 * 60}px`, position: 'relative' }}>
+                  {/* Time column */}
+                  <div style={{ width: '70px', flexShrink: 0, background: '#f4eaf3', borderRight: '2.5px solid #41335f', display: 'flex', flexDirection: 'column' }}>
+                    {HOURS.map((hour) => (
+                      <div key={hour} style={{ height: '60px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: '6px', fontSize: '0.86rem', fontWeight: 'bold', color: '#312b48', borderBottom: '1px solid #e5d3e4', boxSizing: 'border-box', letterSpacing: 'normal', wordSpacing: 'normal' }}>
+                        {String(hour).padStart(2, '0')}:00
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 8 Day columns */}
+                  {DAYS.map((day) => {
+                    const daySlots = getSlotsForDayAndRoom(day.dateStr, roomName)
+                    const layoutMap = computeOverlappingLayout(daySlots)
+                    return (
+                      <div key={day.dateStr} style={{ flex: 1, height: `${12 * 60}px`, position: 'relative', borderRight: '1.5px solid #eed4f1', boxSizing: 'border-box' }}>
+                        {/* Hour background lines */}
+                        {HOURS.map((hour) => (
+                          <div key={hour} style={{ height: '60px', borderBottom: '1px solid #f0e2ef', boxSizing: 'border-box' }} />
+                        ))}
+
+                        {/* Absolute Cards */}
+                        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+                          {daySlots.map((slot) => {
+                            const cardStyle = calculateCardStyle(slot.startTime, slot.endTime, 60)
+                            const sideStyle = layoutMap.get(slot.id)
+                            const combinedStyle = sideStyle
+                              ? { ...cardStyle, left: sideStyle.left, width: sideStyle.width, right: 'auto' }
+                              : cardStyle
+
+                            const sectionsList = slot.sections && slot.sections.length > 0
+                              ? slot.sections.map((s: any) => s.name).join(', ')
+                              : slot.section?.name
+
+                            return (
+                              <div
+                                key={slot.id}
+                                className={`slot-card-absolute ${slot.type ? slot.type.toLowerCase() : 'special'}`}
+                                style={{
+                                  position: 'absolute',
+                                  ...combinedStyle,
+                                  borderRadius: '5px',
+                                  borderWidth: '1.5px',
+                                  borderStyle: 'solid',
+                                  borderLeftWidth: '5px',
+                                  padding: '4px 6px',
+                                  boxSizing: 'border-box',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  overflow: 'hidden',
+                                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                                  fontFamily: 'Arial, Helvetica, sans-serif',
+                                  letterSpacing: 'normal',
+                                  wordSpacing: 'normal',
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
+                                  <span style={{ fontSize: '0.70rem', fontWeight: 'bold', color: '#0f172a', background: 'rgba(0, 0, 0, 0.08)', padding: '2px 5px', borderRadius: '3px', lineHeight: 1.2, letterSpacing: 'normal', wordSpacing: 'normal', whiteSpace: 'nowrap' }}>
+                                    🕒 {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '0.78rem', fontWeight: 'bold', color: '#0f172a', lineHeight: 1.3, margin: '2px 0', letterSpacing: 'normal', wordSpacing: 'normal', wordBreak: 'normal', overflowWrap: 'break-word' }}>
+                                  {slot.title}
+                                </div>
+                                <div style={{ fontSize: '0.66rem', color: '#334155', fontWeight: 'bold', marginTop: 'auto', display: 'flex', flexWrap: 'wrap', gap: '3px 6px', lineHeight: 1.3, letterSpacing: 'normal', wordSpacing: 'normal' }}>
+                                  <span style={{ whiteSpace: 'nowrap' }}>📍 {roomName}</span>
+                                  {sectionsList && <span style={{ whiteSpace: 'nowrap' }}>👥 {sectionsList}</span>}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Footer with Logos */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '20px', marginTop: '12px', paddingTop: '4px' }}>
+                <img src="/s4s-logo.svg" alt="Students 4 Students" style={{ height: '28px', width: '28px', objectFit: 'contain' }} />
+                <img src="/agep.svg" alt="AGEPoly" style={{ height: '24px', width: '105px', objectFit: 'contain' }} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
       {showCreateModal && (
         <CreateClassModal
           defaultSection={activeEntityId}
@@ -942,44 +1481,29 @@ function Schedule() {
           size="md"
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', color: 'var(--s4s-text-primary)' }}>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              <Badge variant="neutral">
-                {(selectedWorkshopForView.rawWorkshop?.category || 'Workshop') === 'Conférences' ? '🎤 Conférence' : '🛠️ Workshop'}
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <Badge variant={selectedWorkshopForView.category === 'Conférences' ? 'secondary' : 'primary'}>
+                {selectedWorkshopForView.category || 'Workshop'}
               </Badge>
-              {selectedWorkshopForView.rawWorkshop?.requiresRegistration ? (
-                <Badge variant="warning">
-                  📝 Inscription requise ({selectedWorkshopForView.rawSession?.registrations?.length || 0}
-                  {selectedWorkshopForView.rawWorkshop?.maxParticipants
-                    ? ` / ${selectedWorkshopForView.rawWorkshop.maxParticipants}`
-                    : ''}
-                  )
-                </Badge>
-              ) : (
-                <Badge variant="success">Accès libre</Badge>
-              )}
+              <span style={{ fontSize: '0.85rem', color: 'var(--s4s-text-muted)' }}>
+                🕒 {formatTime(selectedWorkshopForView.startTime)} - {formatTime(selectedWorkshopForView.endTime)}
+              </span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.9rem' }}>
-              <div>
-                <strong>🕒 Horaire :</strong> {formatTime(selectedWorkshopForView.startTime)} -{' '}
-                {formatTime(selectedWorkshopForView.endTime)}
-              </div>
+            {selectedWorkshopForView.description && (
+              <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.5, color: 'var(--s4s-text-secondary)' }}>
+                {selectedWorkshopForView.description}
+              </p>
+            )}
+
+            <div style={{ background: 'var(--s4s-bg-subtle)', padding: '0.75rem 1rem', borderRadius: 'var(--s4s-radius-md)', fontSize: '0.85rem' }}>
               <div>
                 <strong>📍 Lieu / Salle :</strong> {selectedWorkshopForView.location || 'Non précisé'}
               </div>
             </div>
 
-            {selectedWorkshopForView.description && (
-              <div style={{ background: 'var(--s4s-bg-subtle)', padding: '0.85rem', borderRadius: 'var(--s4s-radius-md)', fontSize: '0.88rem', lineHeight: '1.5' }}>
-                {selectedWorkshopForView.description}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
-              <Link to="/workshops" className="s4s-button s4s-button--secondary s4s-button--sm">
-                Gérer les ateliers
-              </Link>
-              <Button variant="primary" size="sm" onClick={() => setSelectedWorkshopForView(null)}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+              <Button variant="secondary" onClick={() => setSelectedWorkshopForView(null)}>
                 Fermer
               </Button>
             </div>
@@ -992,12 +1516,14 @@ function Schedule() {
 
 interface AbsoluteSlotCardProps {
   slot: any
+  viewType: ViewType
+  activeEntityId?: string
   style: React.CSSProperties
   formatTime: (date: Date | string) => string
   onClick?: () => void
 }
 
-function AbsoluteSlotCard({ slot, style, formatTime, onClick }: AbsoluteSlotCardProps) {
+function AbsoluteSlotCard({ slot, viewType, activeEntityId, style, formatTime, onClick }: AbsoluteSlotCardProps) {
   const cardTypeClass = slot.type ? slot.type.toLowerCase() : 'special'
 
   const isOpTask = slot.isOperationalTask
@@ -1048,6 +1574,15 @@ function AbsoluteSlotCard({ slot, style, formatTime, onClick }: AbsoluteSlotCard
     }
   }
 
+  const sectionsList = slot.sections && slot.sections.length > 0
+    ? slot.sections.map((s: any) => s.name).join(', ')
+    : slot.section?.name
+
+  // When viewing/printing by room, only show the current room instead of the full multi-room list
+  const displayLocation = viewType === 'location' && activeEntityId && activeEntityId !== 'none'
+    ? activeEntityId
+    : slot.location
+
   return (
     <div
       className={`slot-card-absolute ${cardTypeClass}`}
@@ -1056,7 +1591,7 @@ function AbsoluteSlotCard({ slot, style, formatTime, onClick }: AbsoluteSlotCard
       title={`${slot.title}\n🕒 ${formatTime(slot.startTime)} - ${formatTime(slot.endTime)}\n${slot.description || ''}`}
     >
       <div className="card-time">
-        <span>🕒 {formatTime(slot.startTime)} - {formatTime(slot.endTime)}</span>
+        <span className="card-time-badge">🕒 {formatTime(slot.startTime)} - {formatTime(slot.endTime)}</span>
         {isOpTask && (
           <span style={{ fontSize: '0.62rem', background: 'rgba(255, 255, 255, 0.2)', padding: '0.05rem 0.3rem', borderRadius: '3px', marginLeft: 'auto' }}>
             ⚙️ Opération
@@ -1077,9 +1612,14 @@ function AbsoluteSlotCard({ slot, style, formatTime, onClick }: AbsoluteSlotCard
       <div className="card-title">{slot.title}</div>
 
       <div className="card-meta-row">
-        {slot.location && (
-          <span className="card-meta-item" title={`Lieu: ${slot.location}`}>
-            📍 {slot.location}
+        {displayLocation && (
+          <span className="card-meta-item" title={`Lieu: ${displayLocation}`}>
+            📍 {displayLocation}
+          </span>
+        )}
+        {viewType !== 'section' && sectionsList && (
+          <span className="card-meta-item" title={`Section: ${sectionsList}`}>
+            👥 {sectionsList}
           </span>
         )}
       </div>

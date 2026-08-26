@@ -75,7 +75,7 @@ function CreateClassModal({ defaultSection, initialData, onClose }: Props) {
         matched = dbRooms
           .filter((r: any) => {
             const rName = r.name.trim().toUpperCase()
-            return locNames.includes(rName) || locNames.some((l: string) => l === rName || l.includes(rName) || rName.includes(l))
+            return locNames.includes(rName)
           })
           .map((r: any) => r.id)
       }

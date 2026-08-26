@@ -188,6 +188,8 @@ export const workshopsRouter = router({
 
         if (!targetRoomId && !locationName) continue
 
+        const normalizedLocationName = (locationName || targetRoom?.name || '').trim().toUpperCase()
+
         // 1. Check ScheduleSlot conflicts
         const scheduleSlots = await ctx.db.scheduleSlot.findMany({
           where: {
@@ -195,17 +197,21 @@ export const workshopsRouter = router({
             endTime: { gt: startTime },
             OR: [
               targetRoomId ? { roomId: targetRoomId } : undefined,
-              locationName ? { location: { contains: locationName, mode: 'insensitive' } } : undefined,
+              locationName ? { location: { not: null } } : undefined,
             ].filter(Boolean) as any,
           },
         })
         for (const s of scheduleSlots) {
-          conflicts.push({
-            slotIndex: i,
-            type: 'SCHEDULE',
-            severity: 'ERROR',
-            message: `La salle '${locationName || targetRoom?.name}' est occupée par le cours '${s.title}' (${new Date(s.startTime).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })} - ${new Date(s.endTime).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })}).`,
-          })
+          const sTokens = (s.location || '').split(/[,;/]+/).map((r: string) => r.trim().toUpperCase()).filter(Boolean)
+          const isMatch = (targetRoomId && s.roomId === targetRoomId) || (normalizedLocationName && sTokens.includes(normalizedLocationName))
+          if (isMatch) {
+            conflicts.push({
+              slotIndex: i,
+              type: 'SCHEDULE',
+              severity: 'ERROR',
+              message: `La salle '${locationName || targetRoom?.name}' est occupée par le cours '${s.title}' (${new Date(s.startTime).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })} - ${new Date(s.endTime).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })}).`,
+            })
+          }
         }
 
         // 2. Check other WorkshopSession conflicts
@@ -216,20 +222,26 @@ export const workshopsRouter = router({
             endTime: { gt: startTime },
             OR: [
               targetRoomId ? { roomId: targetRoomId } : undefined,
-              locationName ? { location: { contains: locationName, mode: 'insensitive' } } : undefined,
+              locationName ? { location: { not: null } } : undefined,
               targetRoomId ? { workshop: { roomId: targetRoomId } } : undefined,
-              locationName ? { workshop: { location: { contains: locationName, mode: 'insensitive' } } } : undefined,
+              locationName ? { workshop: { location: { not: null } } } : undefined,
             ].filter(Boolean) as any,
           },
           include: { workshop: true },
         })
         for (const ws of workshopSessions) {
-          conflicts.push({
-            slotIndex: i,
-            type: 'WORKSHOP',
-            severity: 'ERROR',
-            message: `La salle '${locationName || targetRoom?.name}' est occupée par le workshop '${ws.workshop.title}' (${new Date(ws.startTime).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })} - ${new Date(ws.endTime).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })}).`,
-          })
+          const wsLoc = ws.location || ws.workshop?.location || ''
+          const wsTokens = wsLoc.split(/[,;/]+/).map((r: string) => r.trim().toUpperCase()).filter(Boolean)
+          const wsRoomId = ws.roomId || ws.workshop?.roomId
+          const isMatch = (targetRoomId && wsRoomId === targetRoomId) || (normalizedLocationName && wsTokens.includes(normalizedLocationName))
+          if (isMatch) {
+            conflicts.push({
+              slotIndex: i,
+              type: 'WORKSHOP',
+              severity: 'ERROR',
+              message: `La salle '${locationName || targetRoom?.name}' est occupée par le workshop '${ws.workshop.title}' (${new Date(ws.startTime).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })} - ${new Date(ws.endTime).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })}).`,
+            })
+          }
         }
 
         // 3. Check Task conflicts
@@ -239,17 +251,21 @@ export const workshopsRouter = router({
             endTime: { gt: startTime },
             OR: [
               targetRoomId ? { roomId: targetRoomId } : undefined,
-              locationName ? { location: { contains: locationName, mode: 'insensitive' } } : undefined,
+              locationName ? { location: { not: null } } : undefined,
             ].filter(Boolean) as any,
           },
         })
         for (const t of tasks) {
-          conflicts.push({
-            slotIndex: i,
-            type: 'TASK',
-            severity: 'ERROR',
-            message: `La salle '${locationName || targetRoom?.name}' est réservée pour la tâche '${t.name}' (${new Date(t.startTime).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })} - ${new Date(t.endTime).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })}).`,
-          })
+          const tTokens = (t.location || '').split(/[,;/]+/).map((r: string) => r.trim().toUpperCase()).filter(Boolean)
+          const isMatch = (targetRoomId && t.roomId === targetRoomId) || (normalizedLocationName && tTokens.includes(normalizedLocationName))
+          if (isMatch) {
+            conflicts.push({
+              slotIndex: i,
+              type: 'TASK',
+              severity: 'ERROR',
+              message: `La salle '${locationName || targetRoom?.name}' est réservée pour la tâche '${t.name}' (${new Date(t.startTime).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })} - ${new Date(t.endTime).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })}).`,
+            })
+          }
         }
 
         // 4. Check Room Availability if targetRoom is defined and has availabilities

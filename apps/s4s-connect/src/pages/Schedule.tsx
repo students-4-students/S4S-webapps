@@ -320,20 +320,12 @@ export default function Schedule() {
                               📍 {slot.location}
                             </Link>
                           )}
-                          {(slot.speaker || slot.assistant || slot.rc) && (
+                          {slot.assistant && (
                             <span
                               className="card-meta-item"
-                              title={[
-                                slot.speaker && `Prof: ${slot.speaker.firstName} ${slot.speaker.lastName}`,
-                                slot.assistant && `Asst: ${slot.assistant.firstName} ${slot.assistant.lastName}`,
-                                slot.rc && `RC: ${slot.rc.firstName} ${slot.rc.lastName}`
-                              ].filter(Boolean).join('\n')}
+                              title={`Asst: ${slot.assistant.firstName} ${slot.assistant.lastName}`}
                             >
-                              {[
-                                slot.speaker && slot.speaker.lastName,
-                                slot.assistant && slot.assistant.lastName,
-                                slot.rc && slot.rc.lastName
-                              ].filter(Boolean)[0]}
+                              {slot.assistant.lastName}
                             </span>
                           )}
                         </div>

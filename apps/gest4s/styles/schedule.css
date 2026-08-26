@@ -1,5 +1,14 @@
 /* apps/gest4s/styles/schedule.css */
 
+:root {
+  --hour-height: 80px;
+}
+
+.print-schedule-banner,
+.print-schedule-footer {
+  display: none;
+}
+
 .schedule-page {
   width: 100%;
   height: 100%;
@@ -370,7 +379,7 @@
 }
 
 .time-grid-cell {
-  height: 80px; /* HOUR_HEIGHT */
+  height: var(--hour-height, 80px);
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -385,13 +394,13 @@
 /* Day Body Column */
 .day-body-column {
   position: relative;
-  height: 960px; /* 12 hours * 80px */
+  height: calc(12 * var(--hour-height, 80px));
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   box-sizing: border-box;
 }
 
 .hour-grid-cell {
-  height: 80px; /* HOUR_HEIGHT */
+  height: var(--hour-height, 80px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   box-sizing: border-box;
 }
@@ -552,172 +561,379 @@
 
 /* Print Styling */
 @media print {
+  :root {
+    --hour-height: 48px;
+  }
+
   @page {
     size: landscape;
-    margin: 0.25in;
+    margin: 0;
+  }
+
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   body, html, #root {
     background: white !important;
-    color: black !important;
-    height: 100% !important;
+    color: var(--primary-purple-dark, #312b48) !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
     width: 100% !important;
-    overflow: hidden !important;
+    overflow: visible !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: block !important;
   }
 
   /* Reset layout wrapper of __root */
-  #root > div {
+  #root > div,
+  #root > div > div {
     display: block !important;
-    height: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
     width: 100% !important;
     position: static !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
   }
 
-  /* Hide navigation, logos and action controls */
+  /* Hide ALL external navigation, toolbars, buttons, modals and non-print images */
+  header,
+  nav,
+  .nav-menu,
   .back-btn,
+  .schedule-header-row,
   .controls-center,
+  .toggle-container,
+  .entity-selector-wrapper,
+  .autocomplete-container,
   .header-right-spacer,
-  img {
+  .s4s-modal-backdrop,
+  .s4s-modal,
+  button,
+  .btn-primary {
     display: none !important;
   }
 
-  .print-subtitle {
-    display: inline-block !important;
-    color: #334155 !important;
+  /* Hide images except in print footer */
+  header img,
+  nav img,
+  .s4s-modal img {
+    display: none !important;
   }
 
+  /* Printable Page Layout */
   .schedule-page {
-    padding: 0 !important;
-    background: transparent !important;
-    color: black !important;
-    transform: scale(0.72);
-    transform-origin: top left;
-    width: 139% !important; /* 1 / 0.72 = 1.39 */
-    height: 139% !important;
-    overflow: hidden !important;
-  }
-
-  .schedule-header-row {
+    padding: 4mm 5mm 3mm 5mm !important;
+    margin: 0 !important;
+    background: white !important;
+    color: var(--primary-purple-dark, #312b48) !important;
     height: auto !important;
-    margin-bottom: 0.5rem !important;
-    grid-template-columns: 1fr !important;
-    text-align: center;
+    min-height: 0 !important;
+    max-height: none !important;
+    width: 100% !important;
+    overflow: visible !important;
+    display: block !important;
+    box-sizing: border-box !important;
+    position: static !important;
+    transform: none !important;
   }
 
-  .schedule-header-row h1 {
-    color: black !important;
-    font-size: 1.6rem !important;
-    margin-bottom: 0.2rem !important;
+  /* Print Banner - visible ONLY in print */
+  .print-schedule-banner {
+    display: flex !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    padding: 0 2px 4px 2px !important;
+    margin-bottom: 4px !important;
+    border-bottom: 2px solid var(--primary-purple, #41335f) !important;
+    background: white !important;
   }
 
+  .print-banner-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+  }
+
+  .print-banner-title {
+    font-size: 1.15rem !important;
+    font-weight: 800 !important;
+    color: var(--primary-purple-dark, #312b48) !important;
+    margin: 0 !important;
+    letter-spacing: -0.01em;
+  }
+
+  .print-banner-badge {
+    font-size: 0.95rem !important;
+    font-weight: 800 !important;
+    color: var(--primary-purple-dark, #312b48) !important;
+    background: var(--primary-pink-light, #f4eaf3) !important;
+    border: 1.5px solid var(--primary-purple, #41335f) !important;
+    padding: 2px 10px !important;
+    border-radius: 6px !important;
+  }
+
+  /* Calendar Container & Grid */
   .calendar-container {
-    background: transparent !important;
-    border: none !important;
+    display: block !important;
+    flex: none !important;
+    background: white !important;
+    border: 1.5px solid var(--primary-purple, #41335f) !important;
+    border-radius: 6px !important;
     overflow: visible !important;
     height: auto !important;
-    width: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    width: 100% !important;
+    position: static !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   .calendar-grid {
-    grid-template-columns: 50px repeat(8, 1fr) !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
     width: 100% !important;
     min-width: 100% !important;
-    border: 1px solid #cbd5e1 !important;
+    position: relative !important;
+    overflow: visible !important;
+    border: none !important;
+    box-sizing: border-box !important;
   }
 
   .corner-header {
-    background: #f1f5f9 !important;
-    height: 50px !important;
-    border-bottom: 2px solid #cbd5e1 !important;
-    border-right: 1px solid #cbd5e1 !important;
+    flex: 0 0 46px !important;
+    width: 46px !important;
+    height: 36px !important;
+    background: var(--primary-pink-light, #f4eaf3) !important;
+    border-bottom: 2px solid var(--primary-purple, #41335f) !important;
+    border-right: 1px solid var(--primary-pink, #eed4f1) !important;
+    position: static !important;
+    box-sizing: border-box !important;
   }
 
   .day-header {
-    background: #f1f5f9 !important;
-    color: black !important;
-    height: 50px !important;
-    border-bottom: 2px solid #cbd5e1 !important;
-    border-right: 1px solid #cbd5e1 !important;
+    flex: 1 1 0 !important;
+    width: calc((100% - 46px) / 8) !important;
+    height: 36px !important;
+    background: var(--primary-pink-light, #f4eaf3) !important;
+    color: var(--primary-purple-dark, #312b48) !important;
+    border-bottom: 2px solid var(--primary-purple, #41335f) !important;
+    border-right: 1px solid var(--primary-pink, #eed4f1) !important;
+    position: static !important;
+    padding: 2px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    box-sizing: border-box !important;
+  }
+
+  .day-header:last-child {
+    border-right: none !important;
   }
 
   .day-header .day-title {
-    font-size: 0.75rem !important;
-    font-weight: 700 !important;
+    font-size: 0.72rem !important;
+    font-weight: 800 !important;
+    color: var(--primary-purple-dark, #312b48) !important;
   }
 
   .day-header .day-subtitle {
-    color: #475569 !important;
-    font-size: 0.6rem !important;
+    color: var(--primary-purple, #41335f) !important;
+    font-size: 0.58rem !important;
+    font-weight: 600 !important;
     margin-top: 0 !important;
   }
 
   .time-column-grid {
-    background: #f8fafc !important;
-    border-right: 1px solid #cbd5e1 !important;
+    flex: 0 0 46px !important;
+    width: 46px !important;
+    height: calc(12 * var(--hour-height, 48px)) !important;
+    background: var(--primary-pink-light, #f4eaf3) !important;
+    border-right: 1.5px solid var(--primary-purple, #41335f) !important;
+    position: static !important;
+    display: flex !important;
+    flex-direction: column !important;
+    box-sizing: border-box !important;
   }
 
   .time-grid-cell {
-    color: #334155 !important;
-    border-bottom: 1px solid #e2e8f0 !important;
-    font-size: 0.7rem !important;
-    font-weight: 700 !important;
-    padding-top: 4px !important;
-  }
-
-  .hour-grid-cell {
-    border-bottom: 1px solid #cbd5e1 !important;
+    color: var(--primary-purple-dark, #312b48) !important;
+    border-bottom: 1px solid #e5d3e4 !important;
+    font-size: 0.72rem !important;
+    font-weight: 800 !important;
+    height: var(--hour-height, 48px) !important;
+    padding-top: 2px !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
   }
 
   .day-body-column {
-    border-right: 1px solid #cbd5e1 !important;
+    flex: 1 1 0 !important;
+    width: calc((100% - 46px) / 8) !important;
+    height: calc(12 * var(--hour-height, 48px)) !important;
+    position: relative !important;
+    border-right: 1px solid #eed4f1 !important;
+    overflow: visible !important;
+    display: block !important;
+    box-sizing: border-box !important;
   }
 
+  .day-body-column:last-child {
+    border-right: none !important;
+  }
+
+  .hour-grid-cell {
+    height: var(--hour-height, 48px) !important;
+    border-bottom: 1px solid #f0e2ef !important;
+    box-sizing: border-box !important;
+  }
+
+  .cards-container {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: visible !important;
+    pointer-events: none !important;
+  }
+
+  /* Slot Cards in Print: High Visibility Occupied Time Blocks */
   .slot-card-absolute {
-    box-shadow: none !important;
-    border: 1px solid #94a3b8 !important;
-    border-left-width: 4px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    border: 1.5px solid #94a3b8 !important;
+    border-left-width: 5px !important;
     padding: 2px 4px !important;
     border-radius: 4px !important;
+    cursor: default !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    overflow: hidden !important;
   }
 
   .card-time {
-    font-size: 0.58rem !important;
-    font-weight: 700 !important;
+    display: flex !important;
+    align-items: center !important;
+    margin-bottom: 2px !important;
+  }
+
+  .card-time-badge {
+    font-size: 0.64rem !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+    background: rgba(0, 0, 0, 0.08) !important;
+    padding: 1px 4px !important;
+    border-radius: 3px !important;
+    line-height: 1.15 !important;
+    display: inline-block !important;
   }
 
   .card-title {
-    font-size: 0.65rem !important;
-    font-weight: 700 !important;
-    line-height: 1.1 !important;
+    font-size: 0.68rem !important;
+    font-weight: 800 !important;
+    line-height: 1.15 !important;
+    color: #0f172a !important;
+    margin: 1px 0 !important;
+    -webkit-line-clamp: 2 !important;
   }
 
   .card-meta-row {
-    font-size: 0.55rem !important;
-    gap: 0.2rem !important;
-    margin-top: 2px !important;
+    font-size: 0.56rem !important;
+    gap: 0.25rem !important;
+    margin-top: auto !important;
+    color: #334155 !important;
+    line-height: 1.1 !important;
   }
 
+  .card-meta-item {
+    font-weight: 700 !important;
+  }
+
+  /* Color Schemes for Print: High Contrast, Vibrant Occupied Blocks */
   .slot-card-absolute.lecture {
+    border-color: #7dd3fc !important;
     border-left-color: #0284c7 !important;
-    background-color: #f0f9ff !important;
-    color: #0369a1 !important;
+    background-color: #e0f2fe !important;
   }
 
   .slot-card-absolute.exercise {
+    border-color: #fcd34d !important;
     border-left-color: #d97706 !important;
-    background-color: #fffbeb !important;
-    color: #b45309 !important;
+    background-color: #fef3c7 !important;
+  }
+
+  .slot-card-absolute.workshop {
+    border-color: #f9a8d4 !important;
+    border-left-color: #db2777 !important;
+    background-color: #fce7f3 !important;
+  }
+
+  .slot-card-absolute.activity {
+    border-color: #86efac !important;
+    border-left-color: #16a34a !important;
+    background-color: #dcfce7 !important;
+  }
+
+  .slot-card-absolute.free {
+    border-color: #cbd5e1 !important;
+    border-left-color: #64748b !important;
+    background-color: #f1f5f9 !important;
   }
 
   .slot-card-absolute.special {
-    border-left-color: #8b5cf6 !important;
-    background-color: #f5f3ff !important;
-    color: #6d28d9 !important;
+    border-color: #d8b4fe !important;
+    border-left-color: #7c3aed !important;
+    background-color: #f3e8ff !important;
   }
 
   .slot-card-absolute.meal {
+    border-color: #5eead4 !important;
     border-left-color: #0d9488 !important;
-    background-color: #f0fdfa !important;
-    color: #0f766e !important;
+    background-color: #ccfbf1 !important;
+  }
+
+  /* Print Footer with S4S & AGEPoly logos */
+  .print-schedule-footer {
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    margin-top: 4px !important;
+    padding-top: 2px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .print-footer-logos {
+    display: flex !important;
+    align-items: center !important;
+    gap: 14px !important;
+  }
+
+  .print-footer-logo-s4s {
+    display: block !important;
+    height: 22px !important;
+    width: 22px !important;
+    object-fit: contain !important;
+  }
+
+  .print-footer-logo-agep {
+    display: block !important;
+    height: 20px !important;
+    width: 88px !important;
+    object-fit: contain !important;
   }
 }
