@@ -132,8 +132,12 @@ function Schedule() {
     workshops.forEach((workshop: any) => {
       (workshop.dates || []).forEach((session: any) => {
         const loc = session.location || session.room?.name || workshop.room?.name || workshop.location || ''
-        const roomId = session.roomId || workshop.roomId || null
-        const roomObj = session.room || workshop.room || null
+        const roomId = session.roomId || workshop.roomId || session.room?.id || workshop.room?.id || null
+        const roomObj =
+          session.room ||
+          workshop.room ||
+          (roomId ? rooms.find((r: any) => r.id === roomId) : null) ||
+          null
 
         const isConf = (workshop.category || 'Workshop') === 'Conférences'
         mapped.push({
@@ -160,7 +164,7 @@ function Schedule() {
       })
     })
     return mapped
-  }, [workshops])
+  }, [workshops, rooms])
 
   const formatTime = (date: Date | string) => {
     const d = typeof date === 'string' ? new Date(date) : date

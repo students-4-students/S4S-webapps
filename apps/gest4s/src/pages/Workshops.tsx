@@ -590,6 +590,9 @@ export default function Workshops() {
           slotRoomId = d.roomId
           const r = dbRooms.find((room: any) => room.id === d.roomId)
           slotLocation = r?.name || null
+        } else {
+          slotRoomId = finalRoomId
+          slotLocation = finalLocation || null
         }
 
         return {

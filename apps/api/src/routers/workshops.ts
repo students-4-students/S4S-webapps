@@ -67,8 +67,8 @@ export const workshopsRouter = router({
             create: dates.map(d => ({
               startTime: new Date(d.startTime),
               endTime: new Date(d.endTime),
-              location: d.location || null,
-              roomId: d.roomId || null,
+              location: d.location || data.location || null,
+              roomId: d.roomId || roomId || null,
             })),
           },
         },
@@ -120,8 +120,8 @@ export const workshopsRouter = router({
           create: dates.map(d => ({
             startTime: new Date(d.startTime),
             endTime: new Date(d.endTime),
-            location: d.location || null,
-            roomId: d.roomId || null,
+            location: d.location || data.location || null,
+            roomId: d.roomId || roomId || null,
           })),
         }
       }
