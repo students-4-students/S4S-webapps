@@ -198,8 +198,14 @@ export default function Workshops() {
   }
 
   const exportParticipantsCSV = (workshop: Workshop, list: Participant[]) => {
+    const sortedList = [...list].sort((a, b) => {
+      const fnCompare = (a.firstName || '').localeCompare(b.firstName || '', 'fr', { sensitivity: 'base' })
+      if (fnCompare !== 0) return fnCompare
+      return (a.lastName || '').localeCompare(b.lastName || '', 'fr', { sensitivity: 'base' })
+    })
+
     const headers = ['Prénom', 'Nom', 'Email', 'Session', 'Statut Émargement']
-    const rows = list.map(p => [
+    const rows = sortedList.map(p => [
       `"${p.firstName}"`,
       `"${p.lastName}"`,
       `"${p.email}"`,
@@ -223,6 +229,12 @@ export default function Workshops() {
       alert("Veuillez autoriser les fenêtres pop-up pour imprimer la liste.")
       return
     }
+
+    const sortedList = [...list].sort((a, b) => {
+      const fnCompare = (a.firstName || '').localeCompare(b.firstName || '', 'fr', { sensitivity: 'base' })
+      if (fnCompare !== 0) return fnCompare
+      return (a.lastName || '').localeCompare(b.lastName || '', 'fr', { sensitivity: 'base' })
+    })
 
     const sessionInfoText = usersSessionFilter === 'all'
       ? `Toutes les sessions (${workshop.dates.length} sessions)`
@@ -418,14 +430,14 @@ export default function Workshops() {
       </div>
     </div>
     <div class="summary-card">
-      <div class="count">${list.length}${workshop.maxParticipants ? ` <span style="font-size:13px;color:#555555;font-weight:500;">/ ${workshop.maxParticipants}</span>` : ''}</div>
+      <div class="count">${sortedList.length}${workshop.maxParticipants ? ` <span style="font-size:13px;color:#555555;font-weight:500;">/ ${workshop.maxParticipants}</span>` : ''}</div>
       <div class="label">Inscrits</div>
     </div>
   </div>
 
   ${sessionInfoText ? `<div class="session-callout"><strong>Session :</strong> ${sessionInfoText}</div>` : ''}
 
-  ${list.length === 0 ? `
+  ${sortedList.length === 0 ? `
     <div style="text-align: center; padding: 40px; color: #555555; font-style: italic;">
       Aucun participant inscrit pour ce créneau.
     </div>
@@ -441,7 +453,7 @@ export default function Workshops() {
         </tr>
       </thead>
       <tbody>
-        ${list.map((p, idx) => `
+        ${sortedList.map((p, idx) => `
           <tr>
             <td class="num-col">${idx + 1}</td>
             <td class="name-col">${p.firstName} ${p.lastName}</td>
@@ -945,16 +957,22 @@ export default function Workshops() {
   }, [activeModalWorkshop])
 
   const filteredParticipants = useMemo(() => {
-    return currentWorkshopParticipants.filter(p => {
-      const matchesSearch = !usersSearchQuery ||
-        p.firstName.toLowerCase().includes(usersSearchQuery.toLowerCase()) ||
-        p.lastName.toLowerCase().includes(usersSearchQuery.toLowerCase()) ||
-        p.email.toLowerCase().includes(usersSearchQuery.toLowerCase()) ||
-        (p.sectionName && p.sectionName.toLowerCase().includes(usersSearchQuery.toLowerCase()))
+    return currentWorkshopParticipants
+      .filter(p => {
+        const matchesSearch = !usersSearchQuery ||
+          p.firstName.toLowerCase().includes(usersSearchQuery.toLowerCase()) ||
+          p.lastName.toLowerCase().includes(usersSearchQuery.toLowerCase()) ||
+          p.email.toLowerCase().includes(usersSearchQuery.toLowerCase()) ||
+          (p.sectionName && p.sectionName.toLowerCase().includes(usersSearchQuery.toLowerCase()))
 
-      const matchesSession = usersSessionFilter === 'all' || p.sessionId === usersSessionFilter
-      return matchesSearch && matchesSession
-    })
+        const matchesSession = usersSessionFilter === 'all' || p.sessionId === usersSessionFilter
+        return matchesSearch && matchesSession
+      })
+      .sort((a, b) => {
+        const fnCompare = (a.firstName || '').localeCompare(b.firstName || '', 'fr', { sensitivity: 'base' })
+        if (fnCompare !== 0) return fnCompare
+        return (a.lastName || '').localeCompare(b.lastName || '', 'fr', { sensitivity: 'base' })
+      })
   }, [currentWorkshopParticipants, usersSearchQuery, usersSessionFilter])
 
   const effectiveWorkshopLocationName = useMemo(() => {
