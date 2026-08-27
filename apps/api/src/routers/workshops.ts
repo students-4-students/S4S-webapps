@@ -105,6 +105,7 @@ export const workshopsRouter = router({
       infoDescription: z.string().nullable().optional(),
       maxParticipants: z.number().nullable().optional(),
       dates: z.array(z.object({
+        id: z.string().optional(),
         startTime: z.string(),
         endTime: z.string(),
         location: z.string().nullable().optional(),
@@ -118,15 +119,47 @@ export const workshopsRouter = router({
       if (roomId !== undefined) {
         updateData.roomId = roomId || null
       }
+
       if (dates) {
-        updateData.dates = {
-          deleteMany: {},
-          create: dates.map(d => ({
-            startTime: new Date(d.startTime),
-            endTime: new Date(d.endTime),
-            location: d.location || data.location || null,
-            roomId: d.roomId || roomId || null,
-          })),
+        const existingSessions = await ctx.db.workshopSession.findMany({
+          where: { workshopId: id },
+        })
+        const incomingIds = dates.map(d => d.id).filter(Boolean) as string[]
+
+        // Delete sessions that were removed in the UI
+        const toDelete = existingSessions.filter(s => !incomingIds.includes(s.id))
+        if (toDelete.length > 0) {
+          await ctx.db.workshopSession.deleteMany({
+            where: { id: { in: toDelete.map(s => s.id) } },
+          })
+        }
+
+        // Update existing sessions or create new ones without losing registrations
+        for (const d of dates) {
+          const sessionLocation = d.location || data.location || null
+          const sessionRoomId = d.roomId !== undefined ? (d.roomId || null) : (roomId !== undefined ? (roomId || null) : null)
+
+          if (d.id && existingSessions.some(s => s.id === d.id)) {
+            await ctx.db.workshopSession.update({
+              where: { id: d.id },
+              data: {
+                startTime: new Date(d.startTime),
+                endTime: new Date(d.endTime),
+                location: sessionLocation,
+                roomId: sessionRoomId,
+              },
+            })
+          } else {
+            await ctx.db.workshopSession.create({
+              data: {
+                workshopId: id,
+                startTime: new Date(d.startTime),
+                endTime: new Date(d.endTime),
+                location: sessionLocation,
+                roomId: sessionRoomId,
+              },
+            })
+          }
         }
       }
 
@@ -306,6 +339,7 @@ export const workshopsRouter = router({
   register: protectedProcedure
     .input(z.object({
       sessionId: z.string(),
+      userId: z.string().optional(),
       firstName: z.string().optional(),
       lastName: z.string().optional(),
       email: z.string().optional(),
@@ -336,10 +370,19 @@ export const workshopsRouter = router({
         }
       }
 
-      const userId = (ctx.user as any)?.id || null
-      const email = input.email || (ctx.user as any)?.email || 'etudiant@epfl.ch'
+      const email = input.email || (ctx.user as any)?.email || null
       const firstName = input.firstName || (ctx.user as any)?.firstName || 'Étudiant'
       const lastName = input.lastName || (ctx.user as any)?.lastName || 'Inscrit'
+
+      let userId = input.userId || null
+      if (!userId && !input.email && !input.firstName && !input.lastName) {
+        userId = (ctx.user as any)?.id || null
+      } else if (!userId && email) {
+        const matchedUser = await ctx.db.user.findUnique({ where: { email } })
+        if (matchedUser) {
+          userId = matchedUser.id
+        }
+      }
 
       // Check if already registered to this session
       const existingInSession = await ctx.db.workshopRegistration.findFirst({
@@ -347,7 +390,7 @@ export const workshopsRouter = router({
           sessionId: input.sessionId,
           OR: [
             userId ? { userId } : undefined,
-            { email },
+            email ? { email } : undefined,
           ].filter(Boolean) as any,
         },
       })
@@ -365,7 +408,7 @@ export const workshopsRouter = router({
             },
             OR: [
               userId ? { userId } : undefined,
-              { email },
+              email ? { email } : undefined,
             ].filter(Boolean) as any,
           },
         })
@@ -373,7 +416,7 @@ export const workshopsRouter = router({
         if (existingInWorkshop) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message: 'Vous êtes déjà inscrit(e) à un créneau pour cet atelier (limité à 1 créneau par participant).',
+            message: 'Ce participant est déjà inscrit à un créneau pour cet atelier (limité à 1 créneau par participant).',
           })
         }
       }
@@ -395,21 +438,32 @@ export const workshopsRouter = router({
   unregister: protectedProcedure
     .input(z.object({
       sessionId: z.string(),
+      userId: z.string().optional(),
       email: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      const userId = (ctx.user as any)?.id || null
-      const email = input.email || (ctx.user as any)?.email || 'etudiant@epfl.ch'
+      let orConditions: any[] = []
+      if (input.email) {
+        orConditions.push({ email: input.email })
+      }
+      if (input.userId) {
+        orConditions.push({ userId: input.userId })
+      }
+      if (orConditions.length === 0) {
+        const userId = (ctx.user as any)?.id || null
+        const email = (ctx.user as any)?.email || null
+        if (userId) orConditions.push({ userId })
+        if (email) orConditions.push({ email })
+      }
 
-      await ctx.db.workshopRegistration.deleteMany({
-        where: {
-          sessionId: input.sessionId,
-          OR: [
-            userId ? { userId } : undefined,
-            email ? { email } : undefined,
-          ].filter(Boolean) as any,
-        },
-      })
+      if (orConditions.length > 0) {
+        await ctx.db.workshopRegistration.deleteMany({
+          where: {
+            sessionId: input.sessionId,
+            OR: orConditions,
+          },
+        })
+      }
 
       workshopEmitter.emit('updated')
       return { success: true }

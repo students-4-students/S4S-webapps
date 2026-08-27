@@ -480,9 +480,27 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
       const aIsPast = new Date(a.endTime).getTime() < now
       const bIsPast = new Date(b.endTime).getTime() < now
       if (aIsPast !== bIsPast) return aIsPast ? 1 : -1  // upcoming first
+
+      const aSpots = getSlotAvailableSpots(a, w.maxParticipants)
+      const bSpots = getSlotAvailableSpots(b, w.maxParticipants)
+      const aIsReg = registeredSlotIds.includes(a.id)
+      const bIsReg = registeredSlotIds.includes(b.id)
+      const aIsFull = aSpots !== null && aSpots.available === 0 && !aIsReg
+      const bIsFull = bSpots !== null && bSpots.available === 0 && !bIsReg
+      if (aIsFull !== bIsFull) return aIsFull ? 1 : -1  // available first
+
       return new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
     })
-  const displayedDates = sortedDates.slice(0, 3)
+
+  // Do not show full slots on top of cards (unless user is already registered for that slot)
+  const activeDates = sortedDates.filter(d => {
+    const isReg = registeredSlotIds.includes(d.id)
+    const spots = getSlotAvailableSpots(d, w.maxParticipants)
+    const isFull = spots !== null && spots.available === 0
+    return !isFull || isReg
+  })
+
+  const displayedDates = activeDates.slice(0, 3)
   const hiddenCount = sortedDates.length - displayedDates.length
 
   const hasWorkshopReg = useMemo(() => {
@@ -569,10 +587,14 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
           <span className="slots-label">{sortedDates.length} créneau{sortedDates.length !== 1 ? 'x' : ''}</span>
           <div className="slots-list">
             {displayedDates.length === 0 ? (
-              <p className="no-slots-text">Aucun créneau défini</p>
+              <p className="no-slots-text">
+                {sortedDates.length === 0
+                  ? 'Aucun créneau défini'
+                  : 'Tous les créneaux sont complets'}
+              </p>
             ) : (
               <>
-                {displayedDates.map((d, idx) => {
+                {displayedDates.map((d) => {
                 const isReg = registeredSlotIds.includes(d.id)
                 const spots = getSlotAvailableSpots(d, w.maxParticipants)
                 const isPast = new Date(d.endTime).getTime() < Date.now()
@@ -581,12 +603,13 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
 
                 const isDisabled = isPast || (isClosed && !isReg) || isBlockedByOtherSlot || (spots !== null && spots.available === 0 && !isReg)
                 const sessionRoomName = d.room?.name || d.location || w.room?.name || w.location
+                const originalIndex = (w.dates || []).findIndex(x => x.id === d.id)
 
                 return (
                   <div key={d.id} className={`slot-option-card ${isReg ? 'registered' : ''} ${isPast ? 'past' : ''}`} onClick={(e) => e.stopPropagation()}>
                     <div className="slot-info">
                       <div className="slot-time">
-                        <span className="slot-num">#{idx + 1}</span>
+                        <span className="slot-num">#{originalIndex >= 0 ? originalIndex + 1 : 1}</span>
                         <span>{formatDateTimeRange(d.startTime, d.endTime)}</span>
                       </div>
                       {sessionRoomName && (

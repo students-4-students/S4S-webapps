@@ -85,6 +85,7 @@ export default function Workshops() {
   const [infoDescription, setInfoDescription] = useState('')
   const [maxParticipants, setMaxParticipants] = useState<number | ''>('')
   const [dates, setDates] = useState<{
+    id?: string
     startTime: string
     endTime: string
     roomId?: string
@@ -149,23 +150,30 @@ export default function Workshops() {
     onSuccess: () => {
       utils.workshops.list.invalidate()
     },
+    onError: (err) => {
+      alert(err.message || "Erreur lors de l'inscription du participant")
+    },
   })
 
   const unregisterMutation = trpc.workshops.unregister.useMutation({
     onSuccess: () => {
       utils.workshops.list.invalidate()
     },
+    onError: (err) => {
+      alert(err.message || "Erreur lors de la désinscription du participant")
+    },
   })
 
   const handleAddParticipantSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!usersModalWorkshop || !selectedStudentId) return
+    if (!activeModalWorkshop || !selectedStudentId) return
     const found = dbStudents.find((s: any) => s.id === selectedStudentId)
     if (!found) return
-    const targetSessionId = selectedSlotId || (usersSessionFilter !== 'all' ? usersSessionFilter : (usersModalWorkshop.dates[0]?.id))
+    const targetSessionId = selectedSlotId || (usersSessionFilter !== 'all' ? usersSessionFilter : (activeModalWorkshop.dates[0]?.id))
     if (targetSessionId) {
       registerMutation.mutate({
         sessionId: targetSessionId,
+        userId: found.id,
         firstName: found.firstName,
         lastName: found.lastName,
         email: found.email,
@@ -178,8 +186,8 @@ export default function Workshops() {
   }
 
   const removeParticipant = (_workshopId: string, participantId: string) => {
-    if (!usersModalWorkshop) return
-    const currentList = getWorkshopParticipants(usersModalWorkshop)
+    if (!activeModalWorkshop) return
+    const currentList = getWorkshopParticipants(activeModalWorkshop)
     const target = currentList.find(p => p.id === participantId)
     if (target && target.sessionId) {
       unregisterMutation.mutate({
@@ -656,6 +664,7 @@ export default function Workshops() {
           }
         }
         return {
+          id: d.id,
           startTime: toLocalDatetimeString(d.startTime),
           endTime: toLocalDatetimeString(d.endTime),
           roomId: dRoomId,
@@ -862,6 +871,7 @@ export default function Workshops() {
         }
 
         return {
+          id: d.id,
           startTime: toISOStringFromLocal(d.startTime),
           endTime: toISOStringFromLocal(d.endTime),
           roomId: slotRoomId,
@@ -924,10 +934,15 @@ export default function Workshops() {
   const hasActiveFilters = searchQuery !== '' || registrationFilter !== 'all' || categoryFilter !== 'all' || timeFilter !== 'all'
 
   // Active Participants List for Modal
+  const activeModalWorkshop = useMemo(() => {
+    if (!usersModalWorkshop) return null
+    return workshops.find((w: Workshop) => w.id === usersModalWorkshop.id) || usersModalWorkshop
+  }, [workshops, usersModalWorkshop])
+
   const currentWorkshopParticipants = useMemo(() => {
-    if (!usersModalWorkshop) return []
-    return getWorkshopParticipants(usersModalWorkshop)
-  }, [usersModalWorkshop])
+    if (!activeModalWorkshop) return []
+    return getWorkshopParticipants(activeModalWorkshop)
+  }, [activeModalWorkshop])
 
   const filteredParticipants = useMemo(() => {
     return currentWorkshopParticipants.filter(p => {
@@ -1656,13 +1671,13 @@ export default function Workshops() {
       )}
 
       {/* Participants List Modal */}
-      {usersModalWorkshop && (
+      {activeModalWorkshop && (
         <div className="modal-overlay" onClick={() => setUsersModalWorkshop(null)}>
           <div className="modal participants-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="header-title-group">
                 <h2>👥 Liste des participants inscrits</h2>
-                <p className="modal-subtitle">{usersModalWorkshop.title} - 📍 {usersModalWorkshop.location}</p>
+                <p className="modal-subtitle">{activeModalWorkshop.title} - 📍 {activeModalWorkshop.location}</p>
               </div>
               <button className="close-btn" onClick={() => setUsersModalWorkshop(null)}>✕</button>
             </div>
@@ -1673,7 +1688,7 @@ export default function Workshops() {
                 <div className="summary-stat">
                   <span className="stat-label">Inscrits totaux</span>
                   <span className="stat-val">
-                    {currentWorkshopParticipants.length} {usersModalWorkshop.maxParticipants ? `/ ${usersModalWorkshop.maxParticipants} max` : ''}
+                    {currentWorkshopParticipants.length} {activeModalWorkshop.maxParticipants ? `/ ${activeModalWorkshop.maxParticipants} max` : ''}
                   </span>
                 </div>
               </div>
@@ -1698,8 +1713,8 @@ export default function Workshops() {
                   onChange={(e) => setUsersSessionFilter(e.target.value)}
                   className="participants-select-filter"
                 >
-                  <option value="all">Toutes les sessions ({usersModalWorkshop.dates.length})</option>
-                  {usersModalWorkshop.dates.map((d, idx) => (
+                  <option value="all">Toutes les sessions ({activeModalWorkshop.dates.length})</option>
+                  {activeModalWorkshop.dates.map((d, idx) => (
                     <option key={d.id} value={d.id}>
                       Session #{idx + 1}: {formatDateTimeRange(d.startTime, d.endTime)}
                     </option>
@@ -1709,14 +1724,14 @@ export default function Workshops() {
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button
                     className="btn-export-print"
-                    onClick={() => exportParticipantsPrint(usersModalWorkshop, filteredParticipants)}
+                    onClick={() => exportParticipantsPrint(activeModalWorkshop, filteredParticipants)}
                     title="Imprimer ou enregistrer en PDF la liste des participants"
                   >
                     🖨️ Imprimer / PDF
                   </button>
                   <button
                     className="btn-export-csv"
-                    onClick={() => exportParticipantsCSV(usersModalWorkshop, filteredParticipants)}
+                    onClick={() => exportParticipantsCSV(activeModalWorkshop, filteredParticipants)}
                     title="Exporter la liste en CSV"
                   >
                     📥 Exporter CSV
@@ -1766,12 +1781,12 @@ export default function Workshops() {
                   <div className="form-group-full">
                     <label className="field-label">Sélectionner le créneau / session :</label>
                     <select
-                      value={selectedSlotId || (usersSessionFilter !== 'all' ? usersSessionFilter : (usersModalWorkshop.dates[0]?.id || ''))}
+                      value={selectedSlotId || (usersSessionFilter !== 'all' ? usersSessionFilter : (activeModalWorkshop.dates[0]?.id || ''))}
                       onChange={(e) => setSelectedSlotId(e.target.value)}
                       className="participants-select-filter full-width"
                       required
                     >
-                      {usersModalWorkshop.dates.map((d, idx) => (
+                      {activeModalWorkshop.dates.map((d, idx) => (
                         <option key={d.id} value={d.id}>
                           📅 Créneau #{idx + 1} : {formatDateTimeRange(d.startTime, d.endTime)}
                         </option>
@@ -1845,7 +1860,7 @@ export default function Workshops() {
                           <td>
                             <button
                               className="btn-remove-participant"
-                              onClick={() => removeParticipant(usersModalWorkshop.id, p.id)}
+                              onClick={() => removeParticipant(activeModalWorkshop.id, p.id)}
                               title="Désinscrire cet étudiant"
                             >
                               ✕ Désinscrire
