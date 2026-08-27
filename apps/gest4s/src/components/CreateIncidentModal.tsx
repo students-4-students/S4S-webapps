@@ -55,6 +55,7 @@ function CreateIncidentModal({ onClose, defaultTitle = '', defaultLocation = '' 
         <Input
           label="Titre"
           required
+          autoFocus
           value={form.title}
           onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
         />

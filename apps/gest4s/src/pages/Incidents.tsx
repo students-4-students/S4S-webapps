@@ -25,7 +25,7 @@ const CATEGORIES = ['Matériel', 'Problèmes techniques', 'Logistique', 'Caterin
 
 function Incidents() {
   const [showModal, setShowModal] = useState(false)
-  const [filters, setFilters] = useState({ status: '', severity: '', category: '', staffId: '' })
+  const [filters, setFilters] = useState({ status: 'IN_PROGRESS', severity: '', category: '', staffId: '' })
 
   const { data: incidents = [], isLoading } = trpc.incidents.list.useQuery(undefined, {
     refetchInterval: 1000,
@@ -130,7 +130,7 @@ function Incidents() {
           )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
             {filtered.map((incident) => (
-              <IncidentCard key={incident.id} incident={incident} showDelete={true} />
+              <IncidentCard key={incident.id} incident={incident} showDelete={false} />
             ))}
           </div>
         </div>
