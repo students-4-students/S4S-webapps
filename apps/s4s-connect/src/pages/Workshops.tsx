@@ -492,12 +492,13 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
       return new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
     })
 
-  // Do not show full slots on top of cards (unless user is already registered for that slot)
+  // Do not show full or finished/past slots on cards (unless user is already registered for that slot)
   const activeDates = sortedDates.filter(d => {
     const isReg = registeredSlotIds.includes(d.id)
+    const isPast = new Date(d.endTime).getTime() < now
     const spots = getSlotAvailableSpots(d, w.maxParticipants)
     const isFull = spots !== null && spots.available === 0
-    return !isFull || isReg
+    return (!isPast && !isFull) || isReg
   })
 
   const displayedDates = activeDates.slice(0, 3)
@@ -590,7 +591,7 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
               <p className="no-slots-text">
                 {sortedDates.length === 0
                   ? 'Aucun créneau défini'
-                  : 'Tous les créneaux sont complets'}
+                  : 'Tous les créneaux sont complets ou passés'}
               </p>
             ) : (
               <>
