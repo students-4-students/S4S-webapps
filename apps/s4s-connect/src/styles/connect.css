@@ -3002,6 +3002,13 @@ body:has(.map-page-container) .app-main {
   color: rgba(255, 255, 255, 0.5);
 }
 
+.flat-item-meta .location-link,
+.flat-item-content .location-link {
+  color: #ffffff !important;
+  font-weight: 600;
+  opacity: 1;
+}
+
 /* Shortcuts Row */
 .shortcuts-row {
   display: flex;

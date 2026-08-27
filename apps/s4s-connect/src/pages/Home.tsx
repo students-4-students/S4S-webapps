@@ -201,7 +201,7 @@ export default function Home() {
                           to="/map"
                           search={{ places: slot.location } as any}
                           className="flat-item-meta location-link"
-                          style={{ textDecoration: 'none', color: 'inherit', cursor: 'pointer' }}
+                          style={{ textDecoration: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer' }}
                           title="Voir sur le plan"
                         >
                           📍 {slot.location}
@@ -243,7 +243,7 @@ export default function Home() {
                             to="/map"
                             search={{ places: reg.location } as any}
                             className="location-link"
-                            style={{ textDecoration: 'none', color: 'inherit', cursor: 'pointer' }}
+                            style={{ textDecoration: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer' }}
                             title="Voir sur le plan"
                           >
                             📍 {reg.location}
