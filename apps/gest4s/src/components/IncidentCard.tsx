@@ -17,13 +17,15 @@ const SEVERITY_LABELS: Record<string, string> = {
   HIGH: 'Élevé',
 }
 
-const STATUS_VARIANTS: Record<string, 'danger' | 'warning' | 'success'> = {
+const STATUS_VARIANTS: Record<string, 'danger' | 'warning' | 'success' | 'info' | 'purple' | 'neutral'> = {
   IN_PROGRESS: 'warning',
+  OPEN_LONG_TERM: 'info',
   RESOLVED: 'success',
 }
 
 const STATUS_LABELS: Record<string, string> = {
   IN_PROGRESS: 'En cours',
+  OPEN_LONG_TERM: 'Ouvert long-term',
   RESOLVED: 'Résolu',
 }
 

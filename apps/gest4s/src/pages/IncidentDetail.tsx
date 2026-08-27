@@ -37,7 +37,7 @@ function IncidentDetail() {
     location: '',
     category: '',
     severity: 'LOW' as 'LOW' | 'MEDIUM' | 'HIGH',
-    status: 'IN_PROGRESS' as 'IN_PROGRESS' | 'RESOLVED',
+    status: 'IN_PROGRESS' as 'IN_PROGRESS' | 'OPEN_LONG_TERM' | 'RESOLVED',
     contactPerson: '',
     keyNumber: '',
     assignedStaffIds: [] as string[],
@@ -214,6 +214,7 @@ function IncidentDetail() {
                 style={{ padding: '0.4rem 0.6rem', border: '1px solid #ddd', borderRadius: '0.4rem', fontFamily: 'inherit', fontSize: '0.9rem', background: 'white' }}
               >
                 <option value='IN_PROGRESS'>En cours</option>
+                <option value='OPEN_LONG_TERM'>Ouvert long-term</option>
                 <option value='RESOLVED'>Résolu</option>
               </select>
             </label>

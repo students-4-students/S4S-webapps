@@ -11,6 +11,7 @@ import '../../styles/dashboard.css'
 const STATUS_OPTIONS = [
   { value: '', label: 'Tous les statuts' },
   { value: 'IN_PROGRESS', label: 'En cours' },
+  { value: 'OPEN_LONG_TERM', label: 'Ouvert long-term' },
   { value: 'RESOLVED', label: 'Résolu' },
 ]
 

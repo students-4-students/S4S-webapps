@@ -67,7 +67,7 @@ export const incidentsRouter = router({
       location: z.string().optional(),
       category: z.string().optional(),
       severity: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
-      status: z.enum(['IN_PROGRESS', 'RESOLVED']).optional(),
+      status: z.enum(['IN_PROGRESS', 'OPEN_LONG_TERM', 'RESOLVED']).optional(),
       contactPerson: z.string().nullable().optional(),
       keyNumber: z.string().nullable().optional(),
       assignedStaffIds: z.array(z.string()).optional(),

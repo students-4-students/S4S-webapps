@@ -317,6 +317,7 @@ enum Priority {
 
 enum IncidentStatus {
   IN_PROGRESS
+  OPEN_LONG_TERM
   RESOLVED
 }
 
