@@ -635,6 +635,24 @@
   transform: translateY(-1px);
 }
 
+.btn-export-print {
+  background: rgba(147, 197, 253, 0.15);
+  border: 1px solid rgba(147, 197, 253, 0.4);
+  color: #93c5fd;
+  border-radius: 0.5rem;
+  padding: 0.55rem 0.95rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-export-print:hover {
+  background: rgba(147, 197, 253, 0.3);
+  transform: translateY(-1px);
+}
+
 .btn-add-participant-trigger {
   background: rgba(238, 212, 241, 0.08);
   border: 1px dashed rgba(238, 212, 241, 0.25);

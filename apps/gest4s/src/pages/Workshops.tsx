@@ -190,12 +190,11 @@ export default function Workshops() {
   }
 
   const exportParticipantsCSV = (workshop: Workshop, list: Participant[]) => {
-    const headers = ['Prénom', 'Nom', 'Email', 'Section', 'Session', 'Statut Émargement']
+    const headers = ['Prénom', 'Nom', 'Email', 'Session', 'Statut Émargement']
     const rows = list.map(p => [
       `"${p.firstName}"`,
       `"${p.lastName}"`,
       `"${p.email}"`,
-      `"${p.sectionName || 'N/A'}"`,
       `"${p.sessionTime || 'Toutes les sessions'}"`,
       `"${p.isPresent ? 'Présent' : 'Attendu'}"`,
     ])
@@ -208,6 +207,263 @@ export default function Workshops() {
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+  }
+
+  const exportParticipantsPrint = (workshop: Workshop, list: Participant[]) => {
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      alert("Veuillez autoriser les fenêtres pop-up pour imprimer la liste.")
+      return
+    }
+
+    const sessionInfoText = usersSessionFilter === 'all'
+      ? `Toutes les sessions (${workshop.dates.length} sessions)`
+      : (workshop.dates.find(d => d.id === usersSessionFilter)
+          ? formatDateTimeRange(
+              workshop.dates.find(d => d.id === usersSessionFilter)!.startTime,
+              workshop.dates.find(d => d.id === usersSessionFilter)!.endTime
+            )
+          : '')
+
+    const htmlContent = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Liste des participants - ${workshop.title}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 1.2cm 1cm;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #000000;
+      background: #ffffff;
+      margin: 0;
+      padding: 24px;
+    }
+    .header {
+      border-bottom: 2px solid #000000;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .title-area h1 {
+      margin: 0 0 4px 0;
+      font-size: 20px;
+      color: #000000;
+      font-weight: 800;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border: 1px solid #000000;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #000000;
+      background: #ffffff;
+      margin-right: 6px;
+    }
+    .meta-info {
+      font-size: 12px;
+      color: #333333;
+      margin-top: 6px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .meta-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .summary-card {
+      border: 1.5px solid #000000;
+      border-radius: 6px;
+      padding: 8px 14px;
+      text-align: right;
+      min-width: 120px;
+      background: #ffffff;
+    }
+    .summary-card .count {
+      font-size: 22px;
+      font-weight: 800;
+      color: #000000;
+      line-height: 1;
+    }
+    .summary-card .label {
+      font-size: 10px;
+      color: #333333;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 3px;
+      font-weight: 700;
+    }
+    .session-callout {
+      border: 1px solid #000000;
+      border-left: 5px solid #000000;
+      padding: 6px 12px;
+      margin-bottom: 16px;
+      border-radius: 0 4px 4px 0;
+      font-size: 12px;
+      color: #000000;
+      background: #ffffff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 11.5px;
+    }
+    th {
+      background: #f0f0f0;
+      color: #000000;
+      font-weight: 700;
+      text-align: left;
+      padding: 8px 10px;
+      border-top: 1px solid #000000;
+      border-bottom: 1.5px solid #000000;
+      text-transform: uppercase;
+      font-size: 10.5px;
+      letter-spacing: 0.5px;
+    }
+    td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #cccccc;
+      vertical-align: middle;
+      color: #000000;
+    }
+    tr:nth-child(even) td {
+      background: #f9f9f9;
+    }
+    .num-col {
+      width: 32px;
+      text-align: center;
+      color: #555555;
+      font-weight: 600;
+    }
+    .name-col {
+      font-weight: 700;
+      color: #000000;
+    }
+    .email-col {
+      color: #222222;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+    }
+    .session-text {
+      color: #333333;
+      font-size: 11px;
+    }
+    .check-box-cell {
+      width: 70px;
+      text-align: center;
+    }
+    .sign-box {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 1.5px solid #000000;
+      border-radius: 3px;
+      background: #ffffff;
+    }
+    .footer {
+      margin-top: 24px;
+      padding-top: 10px;
+      border-top: 1px solid #000000;
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #555555;
+    }
+    @media print {
+      body {
+        padding: 0;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title-area">
+      <div>
+        <span class="badge">${workshop.category || 'Workshop'}</span>
+        ${workshop.requiresRegistration ? '<span class="badge">Inscription requise</span>' : ''}
+      </div>
+      <h1 style="margin-top: 6px;">${workshop.title}</h1>
+      <div class="meta-info">
+        <div class="meta-item"><strong>Lieu :</strong> ${workshop.room?.name || workshop.location || 'Non spécifié'}</div>
+        <div class="meta-item"><strong>Date d'édition :</strong> ${new Date().toLocaleDateString('fr-CH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+      </div>
+    </div>
+    <div class="summary-card">
+      <div class="count">${list.length}${workshop.maxParticipants ? ` <span style="font-size:13px;color:#555555;font-weight:500;">/ ${workshop.maxParticipants}</span>` : ''}</div>
+      <div class="label">Inscrits</div>
+    </div>
+  </div>
+
+  ${sessionInfoText ? `<div class="session-callout"><strong>Session :</strong> ${sessionInfoText}</div>` : ''}
+
+  ${list.length === 0 ? `
+    <div style="text-align: center; padding: 40px; color: #555555; font-style: italic;">
+      Aucun participant inscrit pour ce créneau.
+    </div>
+  ` : `
+    <table>
+      <thead>
+        <tr>
+          <th class="num-col">#</th>
+          <th>Participant</th>
+          <th>Email</th>
+          <th>Session</th>
+          <th class="check-box-cell">Présence</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${list.map((p, idx) => `
+          <tr>
+            <td class="num-col">${idx + 1}</td>
+            <td class="name-col">${p.firstName} ${p.lastName}</td>
+            <td class="email-col">${p.email}</td>
+            <td class="session-text">${p.sessionTime || 'Toutes sessions'}</td>
+            <td class="check-box-cell"><span class="sign-box"></span></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `}
+
+  <div class="footer">
+    <span>Students 4 Students — gest4s</span>
+    <span>Liste d'émargement</span>
+  </div>
+
+  <script>
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        window.print();
+      }, 300);
+    });
+  </script>
+</body>
+</html>`
+
+    printWindow.document.open()
+    printWindow.document.write(htmlContent)
+    printWindow.document.close()
   }
 
   // Real-time Updates via tRPC Subscription
@@ -1450,13 +1706,22 @@ export default function Workshops() {
                   ))}
                 </select>
 
-                <button
-                  className="btn-export-csv"
-                  onClick={() => exportParticipantsCSV(usersModalWorkshop, filteredParticipants)}
-                  title="Exporter la liste en CSV"
-                >
-                  📥 Exporter CSV
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button
+                    className="btn-export-print"
+                    onClick={() => exportParticipantsPrint(usersModalWorkshop, filteredParticipants)}
+                    title="Imprimer ou enregistrer en PDF la liste des participants"
+                  >
+                    🖨️ Imprimer / PDF
+                  </button>
+                  <button
+                    className="btn-export-csv"
+                    onClick={() => exportParticipantsCSV(usersModalWorkshop, filteredParticipants)}
+                    title="Exporter la liste en CSV"
+                  >
+                    📥 Exporter CSV
+                  </button>
+                </div>
               </div>
 
               {/* Manual Add Form */}
