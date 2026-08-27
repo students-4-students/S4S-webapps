@@ -112,6 +112,35 @@ function IncidentCard({ incident, showDelete=true }: { incident: Incident; showD
           {incident.description}
         </p>
 
+        {incident.status === 'RESOLVED' && (incident.resolvedBy || incident.resolvedAt) && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              fontSize: '0.78rem',
+              color: '#16a34a',
+              fontWeight: 500,
+              background: 'rgba(22, 163, 74, 0.08)',
+              padding: '0.2rem 0.5rem',
+              borderRadius: '4px',
+              width: 'fit-content',
+            }}
+          >
+            <span>✓ Résolu</span>
+            {incident.resolvedBy && (
+              <span>
+                par <strong>{incident.resolvedBy.firstName} {incident.resolvedBy.lastName}</strong>
+              </span>
+            )}
+            {incident.resolvedAt && (
+              <span style={{ opacity: 0.9 }}>
+                · {new Date(incident.resolvedAt).toLocaleString('fr-CH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.78rem', color: 'var(--s4s-text-muted)', flexWrap: 'wrap', marginTop: '0.25rem', alignItems: 'center' }}>
           <span style={{ color: SEVERITY_COLOR[incident.severity], fontWeight: 600 }}>
             {SEVERITY_LABELS[incident.severity]}

@@ -2,6 +2,7 @@ import React from 'react'
 
 export interface SearchInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   onClear?: () => void
+  icon?: React.ReactNode
 }
 
 export const SearchInput: React.FC<SearchInputProps> = ({
@@ -10,13 +11,14 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   onClear,
   placeholder = 'Rechercher...',
   className = '',
+  icon = '🔍',
   ...props
 }) => {
   const hasValue = Boolean(value)
 
   return (
     <div className="s4s-search-input-wrapper">
-      <span className="s4s-search-icon">🔍</span>
+      <span className="s4s-search-icon">{icon}</span>
       <input
         type="text"
         value={value}

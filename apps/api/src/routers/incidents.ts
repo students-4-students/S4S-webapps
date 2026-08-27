@@ -11,6 +11,7 @@ export const incidentsRouter = router({
       orderBy: { createdAt: 'desc' },
       include: {
         reportedBy: { select: { firstName: true, lastName: true, telegramUsername: true } },
+        resolvedBy: { select: { firstName: true, lastName: true, telegramUsername: true } },
         assignedStaff: { select: { id: true, firstName: true, lastName: true, role: true } },
       },
     })
@@ -39,6 +40,7 @@ export const incidentsRouter = router({
         },
         include: {
           reportedBy: { select: { firstName: true, lastName: true, telegramUsername: true } },
+          resolvedBy: { select: { firstName: true, lastName: true, telegramUsername: true } },
           assignedStaff: { select: { id: true, firstName: true, lastName: true, role: true } },
         },
       })
@@ -53,6 +55,7 @@ export const incidentsRouter = router({
         where: { id: input.id },
         include: {
           reportedBy: { select: { firstName: true, lastName: true, telegramUsername: true } },
+          resolvedBy: { select: { firstName: true, lastName: true, telegramUsername: true } },
           assignedTo: { select: { id: true, firstName: true, lastName: true } },
           assignedStaff: { select: { id: true, firstName: true, lastName: true, role: true } },
         },
@@ -74,16 +77,40 @@ export const incidentsRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const { id, assignedStaffIds, ...data } = input
+
+      let resolvedUpdate: { resolvedAt?: Date | null; resolvedById?: string | null } = {}
+      if (data.status !== undefined) {
+        if (data.status === 'RESOLVED') {
+          const existing = await ctx.db.incident.findUnique({
+            where: { id },
+            select: { status: true, resolvedAt: true, resolvedById: true },
+          })
+          if (existing?.status !== 'RESOLVED' || !existing?.resolvedAt) {
+            resolvedUpdate = {
+              resolvedAt: new Date(),
+              resolvedById: ctx.user.id,
+            }
+          }
+        } else {
+          resolvedUpdate = {
+            resolvedAt: null,
+            resolvedById: null,
+          }
+        }
+      }
+
       const incident = await ctx.db.incident.update({
         where: { id },
         data: {
           ...data,
+          ...resolvedUpdate,
           ...(assignedStaffIds !== undefined ? {
             assignedStaff: { set: assignedStaffIds.map((sid) => ({ id: sid })) },
           } : {}),
         },
         include: {
           reportedBy: { select: { firstName: true, lastName: true, telegramUsername: true } },
+          resolvedBy: { select: { firstName: true, lastName: true, telegramUsername: true } },
           assignedTo: { select: { id: true, firstName: true, lastName: true } },
           assignedStaff: { select: { id: true, firstName: true, lastName: true, role: true } },
         },
@@ -99,6 +126,7 @@ export const incidentsRouter = router({
         where: { id: input.id },
         include: {
           reportedBy: { select: { firstName: true, lastName: true, telegramUsername: true } },
+          resolvedBy: { select: { firstName: true, lastName: true, telegramUsername: true } },
           assignedTo: { select: { id: true, firstName: true, lastName: true } },
           assignedStaff: { select: { id: true, firstName: true, lastName: true, role: true } },
         },

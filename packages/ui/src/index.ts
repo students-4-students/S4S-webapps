@@ -16,3 +16,4 @@ export * from './components/MultiSelectCombobox'
 
 export * from './utils/csv'
 export * from './utils/date'
+export * from './utils/search'

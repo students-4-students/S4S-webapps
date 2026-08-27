@@ -19,6 +19,7 @@ model User {
   telegramChatId        String?                @unique
   telegramUsername      String?                @unique
   reportedIncidents     Incident[]             @relation("ReportedIncidents")
+  resolvedIncidents     Incident[]             @relation("ResolvedIncidents")
   pollResponses         PollResponse[]
   staffProfile          StaffMember?
   section               Section?               @relation(fields: [sectionId], references: [id])
@@ -136,6 +137,8 @@ model Incident {
   severity      Severity       @default(LOW)
   status        IncidentStatus @default(IN_PROGRESS)
   reportedById  String
+  resolvedById  String?
+  resolvedAt    DateTime?
   createdAt     DateTime       @default(now())
   category      String?
   location      String?
@@ -143,6 +146,7 @@ model Incident {
   keyNumber     String?
   updatedAt     DateTime       @updatedAt
   reportedBy    User           @relation("ReportedIncidents", fields: [reportedById], references: [id])
+  resolvedBy    User?          @relation("ResolvedIncidents", fields: [resolvedById], references: [id])
   assignedTo    User[]         @relation("AssignedIncidents")
   assignedStaff StaffMember[]  @relation("StaffAssignedIncidents")
 }

@@ -4,7 +4,7 @@ import { trpc } from '../trpc'
 import IncidentCard from '../components/IncidentCard'
 import CreateIncidentModal from '../components/CreateIncidentModal'
 import StaffCombobox from '../components/StaffCombobox'
-import { PageHeader, Select, Button, EmptyState, LoadingSpinner } from '@s4s/ui'
+import { SearchInput, PageHeader, Select, Button, EmptyState, LoadingSpinner, matchesSearch } from '@s4s/ui'
 import { useIncidentRealtimeUpdates } from '../hooks/useIncidentRealtimeUpdates'
 import '../../styles/dashboard.css'
 
@@ -26,7 +26,13 @@ const CATEGORIES = ['Matériel', 'Problèmes techniques', 'Logistique', 'Caterin
 
 function Incidents() {
   const [showModal, setShowModal] = useState(false)
-  const [filters, setFilters] = useState({ status: 'IN_PROGRESS', severity: '', category: '', staffId: '' })
+  const [filters, setFilters] = useState({
+    location: '',
+    status: 'IN_PROGRESS',
+    severity: '',
+    category: '',
+    staffId: '',
+  })
 
   const { data: incidents = [], isLoading } = trpc.incidents.list.useQuery(undefined, {
     refetchInterval: 1000,
@@ -35,15 +41,26 @@ function Incidents() {
 
   useIncidentRealtimeUpdates()
 
-  const filtered = incidents.filter(
-    (inc) =>
-      (!filters.status || inc.status === filters.status) &&
-      (!filters.severity || inc.severity === filters.severity) &&
-      (!filters.category || inc.category === filters.category) &&
-      (!filters.staffId || inc.assignedStaff?.some((st) => st.id === filters.staffId))
-  )
+  const filtered = incidents.filter((inc) => {
+    if (filters.status && inc.status !== filters.status) return false
+    if (filters.severity && inc.severity !== filters.severity) return false
+    if (filters.category && inc.category !== filters.category) return false
+    if (filters.staffId && !inc.assignedStaff?.some((st) => st.id === filters.staffId)) return false
 
-  const hasActiveFilters = Boolean(filters.status || filters.severity || filters.category || filters.staffId)
+    if (filters.location && !matchesSearch(inc.location, filters.location)) {
+      return false
+    }
+
+    return true
+  })
+
+  const hasActiveFilters = Boolean(
+    filters.location ||
+    filters.status ||
+    filters.severity ||
+    filters.category ||
+    filters.staffId
+  )
 
   return (
     <div className="dashboard" style={{ position: 'relative' }}>
@@ -57,7 +74,17 @@ function Incidents() {
         />
 
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ width: '180px' }}>
+          <div style={{ width: '160px' }}>
+            <SearchInput
+              icon="📍"
+              placeholder="Lieu..."
+              value={filters.location}
+              onChange={(e) => setFilters((f) => ({ ...f, location: e.target.value }))}
+              onClear={() => setFilters((f) => ({ ...f, location: '' }))}
+            />
+          </div>
+
+          <div style={{ width: '170px' }}>
             <Select
               value={filters.status}
               onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
@@ -70,7 +97,7 @@ function Incidents() {
             </Select>
           </div>
 
-          <div style={{ width: '180px' }}>
+          <div style={{ width: '170px' }}>
             <Select
               value={filters.severity}
               onChange={(e) => setFilters((f) => ({ ...f, severity: e.target.value }))}
@@ -83,7 +110,7 @@ function Incidents() {
             </Select>
           </div>
 
-          <div style={{ width: '200px' }}>
+          <div style={{ width: '190px' }}>
             <Select
               value={filters.category}
               onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value }))}
@@ -97,7 +124,7 @@ function Incidents() {
             </Select>
           </div>
 
-          <div style={{ width: '240px' }}>
+          <div style={{ width: '220px' }}>
             <StaffCombobox
               placeholder="Filtrer par staff..."
               value={filters.staffId}
@@ -111,7 +138,7 @@ function Incidents() {
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => setFilters({ status: '', severity: '', category: '', staffId: '' })}
+              onClick={() => setFilters({ location: '', status: '', severity: '', category: '', staffId: '' })}
             >
               Réinitialiser
             </Button>
@@ -126,7 +153,7 @@ function Incidents() {
               title="Aucun incident trouvé"
               description={hasActiveFilters ? "Essayez d'ajuster vos filtres de recherche." : "Aucun incident n'a été signalé pour le moment."}
               actionLabel={hasActiveFilters ? "Réinitialiser les filtres" : undefined}
-              onAction={hasActiveFilters ? () => setFilters({ status: '', severity: '', category: '' }) : undefined}
+              onAction={hasActiveFilters ? () => setFilters({ location: '', status: '', severity: '', category: '', staffId: '' }) : undefined}
             />
           )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>

@@ -117,6 +117,14 @@ function IncidentDetail() {
               </span>
             </>
           )}
+          {incident.status === 'RESOLVED' && (incident.resolvedBy || incident.resolvedAt) && (
+            <>
+              <span>·</span>
+              <span style={{ color: '#16a34a', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                ✓ Résolu {incident.resolvedBy && <>par <strong>{incident.resolvedBy.firstName} {incident.resolvedBy.lastName}</strong></>} {incident.resolvedAt && <>le {new Date(incident.resolvedAt).toLocaleString('fr-CH')}</>}
+              </span>
+            </>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
