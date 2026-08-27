@@ -18,6 +18,8 @@ export default function Drive() {
   const [editingClassData, setEditingClassData] = useState<any>(null)
   const [showNewFolderModal, setShowNewFolderModal] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
+  const [showVerifyResultModal, setShowVerifyResultModal] = useState(false)
+  const [verifyResult, setVerifyResult] = useState<any>(null)
 
   // Form States
   const [newFolderName, setNewFolderName] = useState('')
@@ -61,6 +63,17 @@ export default function Drive() {
   const deleteFileMutation = trpc.drive.deleteFile.useMutation({
     onSuccess: () => {
       utils.drive.getClassContents.invalidate({ classId: selectedClassId || '' })
+    },
+  })
+
+  const verifyFilesMutation = trpc.drive.verifyFiles.useMutation({
+    onSuccess: (result) => {
+      setVerifyResult(result)
+      setShowVerifyResultModal(true)
+      utils.drive.getClassContents.invalidate()
+    },
+    onError: (err) => {
+      alert(`Erreur lors de la vérification des fichiers : ${err.message}`)
     },
   })
 
@@ -146,8 +159,17 @@ export default function Drive() {
   const handleCreateFile = (e: React.FormEvent) => {
     e.preventDefault()
     if (!newFileName.trim() || !selectedClassId) return
+
+    let nameToSubmit = newFileName.trim()
+    if (selectedFile?.name) {
+      const origExtMatch = selectedFile.name.match(/\.([a-zA-Z0-9]+)$/)
+      if (origExtMatch && !nameToSubmit.includes('.')) {
+        nameToSubmit = `${nameToSubmit}.${origExtMatch[1]}`
+      }
+    }
+
     createFileMutation.mutate({
-      name: newFileName.trim(),
+      name: nameToSubmit,
       mimeType: newFileType,
       size: Number(newFileSize),
       classId: selectedClassId,
@@ -242,16 +264,26 @@ export default function Drive() {
           )}
         </div>
         {user?.role === 'ADMIN' && (
-          <button
-            className="create-class-btn"
-            onClick={() => {
-              setEditingClassData(null)
-              setShowConfigModal(true)
-              setIsMobileSidebarOpen(false)
-            }}
-          >
-            + Créer une classe
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <button
+              className="create-class-btn"
+              onClick={() => {
+                setEditingClassData(null)
+                setShowConfigModal(true)
+                setIsMobileSidebarOpen(false)
+              }}
+            >
+              + Créer une classe
+            </button>
+            <button
+              className="verify-files-sidebar-btn"
+              onClick={() => verifyFilesMutation.mutate({})}
+              disabled={verifyFilesMutation.isPending}
+              title="Vérifier et corriger les extensions de tous les fichiers"
+            >
+              {verifyFilesMutation.isPending ? '⏳ Vérification...' : '🔍 Vérifier les fichiers'}
+            </button>
+          </div>
         )}
 
         {loadingClasses ? (
@@ -355,6 +387,16 @@ export default function Drive() {
                 </div>
               </div>
               <div className="header-actions">
+                {user?.role === 'ADMIN' && (
+                  <button
+                    className="btn-verify-files"
+                    onClick={() => verifyFilesMutation.mutate({ classId: selectedClassId || undefined })}
+                    disabled={verifyFilesMutation.isPending}
+                    title="Vérifier que les fichiers ont la bonne extension"
+                  >
+                    {verifyFilesMutation.isPending ? '⏳ Vérification...' : '🔍 Vérifier les fichiers'}
+                  </button>
+                )}
                 {contents?.canWrite && (
                   <>
                     <button className="btn-new-folder" onClick={() => setShowNewFolderModal(true)}>
@@ -615,6 +657,80 @@ export default function Drive() {
               </Button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* Verify Files Result Modal */}
+      {showVerifyResultModal && verifyResult && (
+        <Modal
+          isOpen
+          onClose={() => setShowVerifyResultModal(false)}
+          title="🔍 Vérification des fichiers"
+          size="lg"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {/* Stats Overview */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
+              <div style={{ background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(238, 212, 241, 0.2)', borderRadius: '10px', padding: '0.85rem', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.7)', marginBottom: '0.25rem' }}>Total analysés</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ffffff' }}>{verifyResult.totalChecked}</div>
+              </div>
+              <div style={{ background: 'rgba(39, 174, 96, 0.12)', border: '1px solid rgba(39, 174, 96, 0.3)', borderRadius: '10px', padding: '0.85rem', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.75rem', color: '#2ecc71', marginBottom: '0.25rem' }}>Déjà conformes</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#2ecc71' }}>{verifyResult.totalValid}</div>
+              </div>
+              <div style={{ background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '10px', padding: '0.85rem', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.75rem', color: '#f59e0b', marginBottom: '0.25rem' }}>Extensions corrigées</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#f59e0b' }}>{verifyResult.totalFixed}</div>
+              </div>
+              {verifyResult.totalUnknown > 0 && (
+                <div style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '10px', padding: '0.85rem', textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#ef4444', marginBottom: '0.25rem' }}>Type MIME inconnu</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ef4444' }}>{verifyResult.totalUnknown}</div>
+                </div>
+              )}
+            </div>
+
+            {verifyResult.fixedFiles.length > 0 ? (
+              <div>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem', color: '#ffffff' }}>
+                  Fichiers corrigés ({verifyResult.fixedFiles.length}) :
+                </h4>
+                <div style={{ maxHeight: '260px', overflowY: 'auto', border: '1px solid rgba(238, 212, 241, 0.2)', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.25)' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(238, 212, 241, 0.15)', background: 'rgba(255, 255, 255, 0.05)' }}>
+                        <th style={{ padding: '0.6rem 0.8rem', color: 'rgba(255, 255, 255, 0.8)' }}>Ancien nom</th>
+                        <th style={{ padding: '0.6rem 0.8rem', color: 'rgba(255, 255, 255, 0.8)' }}>Nouveau nom</th>
+                        <th style={{ padding: '0.6rem 0.8rem', color: 'rgba(255, 255, 255, 0.8)' }}>Type MIME</th>
+                        <th style={{ padding: '0.6rem 0.8rem', color: 'rgba(255, 255, 255, 0.8)' }}>Classe</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {verifyResult.fixedFiles.map((file: any) => (
+                        <tr key={file.id} style={{ borderBottom: '1px solid rgba(238, 212, 241, 0.08)' }}>
+                          <td style={{ padding: '0.6rem 0.8rem', color: '#f87171' }}>{file.oldName}</td>
+                          <td style={{ padding: '0.6rem 0.8rem', color: '#4ade80', fontWeight: 600 }}>{file.newName}</td>
+                          <td style={{ padding: '0.6rem 0.8rem', color: 'rgba(255, 255, 255, 0.65)' }}>{file.mimeType}</td>
+                          <td style={{ padding: '0.6rem 0.8rem', color: 'rgba(255, 255, 255, 0.65)' }}>{file.className || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '1rem', background: 'rgba(39, 174, 96, 0.15)', border: '1px solid rgba(39, 174, 96, 0.3)', borderRadius: '10px', color: '#4ade80', textAlign: 'center', fontSize: '0.9rem' }}>
+                ✅ Tous les fichiers analysés possèdent déjà une extension valide correspondant à leur type MIME en base de données.
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+              <Button variant="primary" onClick={() => setShowVerifyResultModal(false)}>
+                Fermer
+              </Button>
+            </div>
+          </div>
         </Modal>
       )}
     </div>

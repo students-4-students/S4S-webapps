@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import mime from 'mime-types'
 import { z } from 'zod'
 import { router, protectedProcedure, adminProcedure } from '../trpc/trpc'
 import { TRPCError } from '@trpc/server'
@@ -275,6 +276,9 @@ export const driveRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: "Vous n'avez pas l'autorisation d'écriture sur ce Drive." })
       }
 
+      // Enforce correct file extension according to mimeType
+      const { name: finalName, mimeType: finalMimeType } = ensureCorrectFileExtension(name.trim(), mimeType)
+
       let fileKey = `file-${Date.now()}`
 
       if (content) {
@@ -284,7 +288,7 @@ export const driveRouter = router({
             fs.mkdirSync(uploadsDir, { recursive: true })
           }
 
-          const filename = `${Date.now()}-${name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+          const filename = `${Date.now()}-${finalName.replace(/[^a-zA-Z0-9._-]/g, '_')}`
           const filePath = path.join(uploadsDir, filename)
 
           // Decode base64 data URL or raw string content
@@ -301,8 +305,8 @@ export const driveRouter = router({
 
       return db.file.create({
         data: {
-          name,
-          mimeType,
+          name: finalName,
+          mimeType: finalMimeType,
           size,
           bucket: 's4s-drive',
           key: fileKey,
@@ -344,6 +348,78 @@ export const driveRouter = router({
         where: { id },
       })
       return { success: true }
+    }),
+
+  // Admin file extension verification
+  verifyFiles: adminProcedure
+    .input(z.object({
+      classId: z.string().optional().nullable(),
+    }).optional())
+    .mutation(async ({ input, ctx }) => {
+      const { db } = ctx
+      const classId = input?.classId
+
+      const where = classId ? { classId } : {}
+      const files = await db.file.findMany({
+        where,
+        include: {
+          Class: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: { name: 'asc' },
+      })
+
+      let totalChecked = 0
+      let totalValid = 0
+      let totalFixed = 0
+      let totalUnknown = 0
+      const fixedFiles: Array<{
+        id: string
+        oldName: string
+        newName: string
+        mimeType: string
+        className: string | null
+      }> = []
+
+      for (const file of files) {
+        totalChecked++
+        const { name: newName, mimeType: finalMimeType, isModified, isUnknown } = ensureCorrectFileExtension(file.name, file.mimeType)
+
+        if (isUnknown) {
+          totalUnknown++
+          continue
+        }
+
+        if (isModified) {
+          await db.file.update({
+            where: { id: file.id },
+            data: { name: newName, mimeType: finalMimeType },
+          })
+
+          totalFixed++
+          fixedFiles.push({
+            id: file.id,
+            oldName: file.name,
+            newName,
+            mimeType: finalMimeType,
+            className: file.Class?.name || null,
+          })
+        } else {
+          totalValid++
+        }
+      }
+
+      return {
+        totalChecked,
+        totalValid,
+        totalFixed,
+        totalUnknown,
+        fixedFiles,
+      }
     }),
 })
 
@@ -394,4 +470,62 @@ async function checkAccess(classId: string, user: any, db: any): Promise<{ read:
 
   const isLinkedToSection = cls.Section.some((s: any) => s.id === student.sectionId)
   return { read: isLinkedToSection, write: false }
+}
+
+/**
+ * Ensures a file name ends with the valid extension corresponding to its MIME type.
+ */
+export function ensureCorrectFileExtension(fileName: string, inputMimeType: string): {
+  name: string
+  mimeType: string
+  isModified: boolean
+  isUnknown: boolean
+} {
+  let resolvedMimeType = inputMimeType
+  if ((!resolvedMimeType || resolvedMimeType === 'application/octet-stream') && fileName) {
+    const guessed = mime.lookup(fileName)
+    if (guessed) resolvedMimeType = guessed
+  }
+
+  const extWithDot = path.extname(fileName)
+  const currentExt = extWithDot.startsWith('.') ? extWithDot.slice(1).toLowerCase() : ''
+
+  const knownExts = (mime.extensions as Record<string, string[]>)[resolvedMimeType] || []
+  const defaultExt = mime.extension(resolvedMimeType)
+
+  const validExts = new Set<string>()
+  if (defaultExt) validExts.add(defaultExt.toLowerCase())
+  knownExts.forEach((e) => validExts.add(e.toLowerCase()))
+
+  // Common fallbacks / aliases
+  if (resolvedMimeType === 'application/pdf') validExts.add('pdf')
+  if (resolvedMimeType === 'image/jpeg' || resolvedMimeType === 'image/jpg') {
+    validExts.add('jpg')
+    validExts.add('jpeg')
+  }
+  if (resolvedMimeType === 'image/png') validExts.add('png')
+
+  if (validExts.size === 0) {
+    return { name: fileName, mimeType: resolvedMimeType, isModified: false, isUnknown: true }
+  }
+
+  if (currentExt && validExts.has(currentExt)) {
+    return { name: fileName, mimeType: resolvedMimeType, isModified: false, isUnknown: false }
+  }
+
+  const targetExt = defaultExt || Array.from(validExts)[0]
+  let newName = fileName
+  if (!currentExt) {
+    newName = `${fileName}.${targetExt}`
+  } else {
+    const baseName = fileName.slice(0, -extWithDot.length)
+    newName = `${baseName}.${targetExt}`
+  }
+
+  return {
+    name: newName,
+    mimeType: resolvedMimeType,
+    isModified: newName !== fileName,
+    isUnknown: false,
+  }
 }
