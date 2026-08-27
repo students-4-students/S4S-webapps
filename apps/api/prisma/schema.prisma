@@ -371,6 +371,8 @@ model Workshop {
   onlyOneSlotPerUser      Boolean           @default(false)   // User can only register to 1 slot of this workshop
   isRegistrationClosed    Boolean           @default(false)   // Registrations closed by admin
   externalRegistrationUrl String?           // URL to external registration form (Google Form, etc.)
+  infoUrl                 String?           // Link for extra info / external website / resources
+  infoDescription         String?           // Optional label or description for the info link
   maxParticipants         Int?              // Null means unlimited or not applicable
   dates                   WorkshopSession[]
   favorites               WorkshopFavorite[]

@@ -44,6 +44,8 @@ interface Workshop {
   onlyOneSlotPerUser?: boolean
   isRegistrationClosed?: boolean
   externalRegistrationUrl?: string | null
+  infoUrl?: string | null
+  infoDescription?: string | null
   maxParticipants: number | null
   dates: WorkshopSession[]
 }
@@ -527,6 +529,18 @@ function WorkshopCard({ workshop: w, registeredSlotIds, getSlotAvailableSpots, o
               1 créneau max
             </span>
           )}
+          {w.infoUrl && (
+            <span
+              className="badge-reg"
+              style={{
+                background: 'rgba(99, 102, 241, 0.25)',
+                color: '#a5b4fc',
+                borderColor: 'rgba(99, 102, 241, 0.45)',
+              }}
+            >
+              🔗 {w.infoDescription || 'Infos'}
+            </span>
+          )}
         </div>
         {/* Favorite button placed independently on top-right */}
         <button className={`workshop-fav-btn ${isFavorite ? 'active' : ''}`} onClick={onFavoriteToggle} aria-label="Ajouter aux favoris">
@@ -784,6 +798,27 @@ function WorkshopDetail({ workshop: w, registeredSlotIds, getSlotAvailableSpots,
               <div style={{ fontSize: '0.82rem', color: '#d8b4fe' }}>
                 Cet atelier est limité à <strong>1 seul créneau</strong> par étudiant afin de permettre à un maximum de personnes d'y participer.
               </div>
+            </div>
+          )}
+
+          {/* Extra info link banner */}
+          {w.infoUrl && (
+            <div style={{ margin: '0.85rem 0', padding: '0.85rem 1.1rem', background: 'rgba(99, 102, 241, 0.15)', border: '1px solid rgba(99, 102, 241, 0.35)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '0.86rem', color: '#e0e7ff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '1.1rem' }}>🔗</span>
+                <span>
+                  <strong>{w.infoDescription ? w.infoDescription : "Plus d'informations"} </strong>
+                </span>
+              </div>
+              <a
+                href={w.infoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-slot-register external-link-btn"
+                style={{ padding: '0.45rem 0.95rem', fontSize: '0.82rem', textDecoration: 'none', background: 'var(--s4s-primary, #6366f1)', color: '#ffffff', borderRadius: '8px', whiteSpace: 'nowrap' }}
+              >
+                <span>Ouvrir le lien ↗</span>
+              </a>
             </div>
           )}
 

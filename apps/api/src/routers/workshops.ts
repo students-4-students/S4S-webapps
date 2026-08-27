@@ -48,6 +48,8 @@ export const workshopsRouter = router({
       onlyOneSlotPerUser: z.boolean().default(false),
       isRegistrationClosed: z.boolean().default(false),
       externalRegistrationUrl: z.string().nullable().optional(),
+      infoUrl: z.string().nullable().optional(),
+      infoDescription: z.string().nullable().optional(),
       maxParticipants: z.number().nullable().optional(),
       dates: z.array(z.object({
         startTime: z.string(),
@@ -99,6 +101,8 @@ export const workshopsRouter = router({
       onlyOneSlotPerUser: z.boolean().optional(),
       isRegistrationClosed: z.boolean().optional(),
       externalRegistrationUrl: z.string().nullable().optional(),
+      infoUrl: z.string().nullable().optional(),
+      infoDescription: z.string().nullable().optional(),
       maxParticipants: z.number().nullable().optional(),
       dates: z.array(z.object({
         startTime: z.string(),

@@ -38,6 +38,8 @@ interface Workshop {
   onlyOneSlotPerUser?: boolean
   isRegistrationClosed?: boolean
   externalRegistrationUrl?: string | null
+  infoUrl?: string | null
+  infoDescription?: string | null
   maxParticipants: number | null
   dates: WorkshopSession[]
 }
@@ -79,6 +81,8 @@ export default function Workshops() {
   const [onlyOneSlotPerUser, setOnlyOneSlotPerUser] = useState(false)
   const [isRegistrationClosed, setIsRegistrationClosed] = useState(false)
   const [externalRegistrationUrl, setExternalRegistrationUrl] = useState('')
+  const [infoUrl, setInfoUrl] = useState('')
+  const [infoDescription, setInfoDescription] = useState('')
   const [maxParticipants, setMaxParticipants] = useState<number | ''>('')
   const [dates, setDates] = useState<{
     startTime: string
@@ -325,6 +329,8 @@ export default function Workshops() {
     setOnlyOneSlotPerUser(false)
     setIsRegistrationClosed(false)
     setExternalRegistrationUrl('')
+    setInfoUrl('')
+    setInfoDescription('')
     setMaxParticipants('')
     
     const now = new Date()
@@ -370,6 +376,8 @@ export default function Workshops() {
     setOnlyOneSlotPerUser(Boolean(w.onlyOneSlotPerUser))
     setIsRegistrationClosed(Boolean(w.isRegistrationClosed))
     setExternalRegistrationUrl(w.externalRegistrationUrl || '')
+    setInfoUrl(w.infoUrl || '')
+    setInfoDescription(w.infoDescription || '')
     setMaxParticipants(w.maxParticipants ?? '')
     
     const sortedDates = [...(w.dates || [])].sort(
@@ -578,6 +586,8 @@ export default function Workshops() {
       onlyOneSlotPerUser: requiresRegistration ? onlyOneSlotPerUser : false,
       isRegistrationClosed,
       externalRegistrationUrl: requiresRegistration && externalRegistrationUrl.trim() ? externalRegistrationUrl.trim() : null,
+      infoUrl: infoUrl.trim() ? infoUrl.trim() : null,
+      infoDescription: infoDescription.trim() ? infoDescription.trim() : null,
       maxParticipants: requiresRegistration && !externalRegistrationUrl.trim() && maxParticipants !== '' ? Number(maxParticipants) : null,
       dates: dates.map(d => {
         let slotRoomId: string | null = null
@@ -860,6 +870,24 @@ export default function Workshops() {
                           1 créneau max
                         </span>
                       )}
+                      {w.infoUrl && (
+                        <a
+                          href={w.infoUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="badge"
+                          style={{
+                            textDecoration: 'none',
+                            background: 'rgba(99, 102, 241, 0.15)',
+                            color: '#6366f1',
+                            border: '1px solid rgba(99, 102, 241, 0.35)',
+                            fontWeight: 600,
+                          }}
+                          title={w.infoDescription ? `Ouvrir : ${w.infoDescription}` : "Ouvrir le lien d'informations"}
+                        >
+                          🔗 {w.infoDescription || "Plus d'infos"} ↗
+                        </a>
+                      )}
                     </div>
                   </div>
 
@@ -1045,6 +1073,34 @@ export default function Workshops() {
                   onChange={(e) => setDescription(e.target.value)}
                 />
               </label>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <label>
+                  Lien d'information supplémentaire (optionnel)
+                  <input
+                    type="url"
+                    placeholder="https://... (ex: site web, ressources, slides)"
+                    value={infoUrl}
+                    onChange={(e) => setInfoUrl(e.target.value)}
+                  />
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem', display: 'block' }}>
+                    URL du lien externe pour cet atelier.
+                  </span>
+                </label>
+
+                <label>
+                  Texte / description du lien (optionnel)
+                  <input
+                    type="text"
+                    placeholder="Ex: Slides du cours, Dépôt GitHub..."
+                    value={infoDescription}
+                    onChange={(e) => setInfoDescription(e.target.value)}
+                  />
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem', display: 'block' }}>
+                    Libellé affiché sur le bouton (par défaut : « Plus d'infos »).
+                  </span>
+                </label>
+              </div>
 
               <div className="modal-registration-box">
                 <span className="modal-section-title">Options d'inscription</span>
